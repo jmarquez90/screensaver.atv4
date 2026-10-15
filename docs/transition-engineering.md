@@ -1,6 +1,6 @@
 # Smooth random transitions: engineering baseline
 
-Status: diagnostic checkpoint deployed; no transition fix is implemented here.
+Status: cached and streamed diagnostic checkpoints completed; no transition fix is implemented here.
 
 ## Non-negotiable behavior
 
@@ -82,7 +82,7 @@ created a new input stream and demuxer, opened the DRM PRIME V4L2 H.264 decoder,
 video thread before `onAVStarted()` fired.
 
 The result demonstrates two independent contributors with network transfer absent: 256 ms in the
-add-on's polling handoff and 451 ms between the next request and Kodi reporting A/V available. The
+add-on's polling handoff and 451 ms between the next request and Kodi emitting `onAVStarted()`. The
 total was 708 ms from `playback-ended` and approximately 1.12 seconds from demuxer EOF. Removing
 the polling delay alone therefore cannot produce a continuous transition.
 
@@ -91,7 +91,44 @@ boundary, so the display path cannot yet be excluded entirely.
 
 The user reports that the visible black interval in the prior equivalent test felt slightly under
 one second and lasted only a split second. That observation is consistent with the measured 708 ms
-callback-to-A/V interval, but it is not a frame-accurate display measurement.
+`playback-ended`-to-callback interval, but it is not a frame-accurate display measurement.
+
+### Demonstrated by the target-Pi streamed checkpoint
+
+The controlled streamed comparison retained the existing two-item randomized playlist. Only the
+Alaskan Jellies location was enabled, both eligible files were present in the normal cache, and the
+test temporarily pointed cache lookup at a nonexistent directory while `force-offline` was false.
+Thus either random selection remained eligible but had to use its network URL. Kodi was stopped
+before editing settings, and the original settings file had a verified byte-for-byte backup.
+Direct edits made while Kodi was running did not change the live screensaver behavior; stop Kodi
+before editing add-on settings files so its cached state cannot ignore or overwrite the change.
+
+The first streamed item ran to its natural end without a diagnostic playback-error callback. Its
+`play-requested` to `av-started` interval was 619.117 ms. The successor then produced this timeline:
+
+| Event | Session time | Delta |
+| --- | ---: | ---: |
+| `playback-ended` | 388162.444 ms | — |
+| `stopped-observed` | 388646.956 ms | 484.512 ms |
+| `play-requested` | 388647.313 ms | 0.357 ms |
+| `play-returned` | 388647.731 ms | 0.418 ms |
+| `av-started` | 389191.143 ms | 543.830 ms from request |
+
+The callback arrived 1,028.699 ms after `playback-ended`, but the television remained black after
+the successor was nominally started. Kodi had created the input stream, demuxer, V4L2 H.264 decoder,
+and video thread and emitted `onAVStarted()`. When playback was stopped roughly 30 seconds later,
+Kodi logged `OutputPicture - timeout waiting for buffer`. It did not emit the diagnostic
+`playback-error` callback.
+
+This is not evidence of a Kodi process crash. It demonstrates a streamed-successor stall after
+player setup and proves that `onAVStarted()` cannot be treated as a first-visible-frame signal—or
+even as proof that the decoder will deliver a visible frame. The exact cause of the missing output
+buffer remains unverified.
+
+After the test, Kodi was stopped, the original settings file was restored to its pre-test SHA-256,
+the catalog hash was confirmed unchanged, and Kodi was restarted. A cached launch then selected
+`source=local`, emitted `av-started`, and stopped cleanly. Visible output in that final regression
+launch was not independently confirmed.
 
 ### Not yet demonstrated on the target Pi
 
@@ -99,7 +136,8 @@ callback-to-A/V interval, but it is not a frame-accurate display measurement.
   the television. The user-observed duration is already consistent with the measured timeline.
 - Whether any portion of the visible interval occurs in display synchronization despite no logged
   resolution or HDMI mode change.
-- How a streamed transition compares with the measured cached transition.
+- Whether the streamed-successor output-buffer stall is reproducible and whether it is specific to
+  one asset, the HTTP source path, buffering, or V4L2 decoder state across the item boundary.
 - Whether identical codec, resolution, frame-rate, color-space, and HDR metadata
   materially reduce the gap on this exact display chain.
 - Whether Kodi exposes a usable final decoded frame during teardown.
@@ -124,9 +162,10 @@ These are alternatives, not decisions:
    overlays, but it has the largest hardware-decoding, lifecycle, and packaging
    surface.
 
-No candidate should be implemented until the cached result is compared with one streamed
-transition. External frame-accurate recording remains useful for validating a final implementation,
-but it is not a prerequisite for architecture selection.
+The cached and streamed timing checkpoints are complete, but no candidate should be implemented
+until the streamed-successor stall is isolated. External frame-accurate recording remains useful
+for validating a final implementation, but it is not a prerequisite for investigating this stall
+or comparing architecture boundaries.
 
 ## Regression harness
 
@@ -145,8 +184,8 @@ current contract at the future replacement seam:
 - the successor `play()` request happens only after the polling loop observes a
   stopped player.
 
-The instrumented Pi checkpoint is complete. Retain these tests as protection for randomness,
-cache behavior, and item selection while the visual and streamed comparison checkpoints proceed.
+The instrumented cached and streamed checkpoints are complete. Retain these tests as protection
+for randomness, cache behavior, and item selection while the streamed-successor stall is isolated.
 
 ## Diagnostic event timeline
 
@@ -165,7 +204,8 @@ The relevant intervals are:
 | `play-requested` | `av-started` | Kodi input, demux, decode, and renderer startup |
 
 `play-returned` only records when the Python call returns; it does not claim that
-a decoded frame is visible. Kodi callbacks likewise cannot prove what the display
-is showing. The Pi test must pair this timeline with an external recording of the
-screen, because the prior screenshot path did not capture a PNG and may not see
-the hardware video plane.
+a decoded frame is visible. The streamed checkpoint demonstrated that Kodi can emit
+`onAVStarted()` while the television remains black and later log an output-buffer timeout.
+Kodi callbacks therefore cannot prove what the display is showing. External recording remains
+useful for final visual validation, but direct observation and Kodi logs are sufficient to reject
+this streamed handoff as unsuccessful.
