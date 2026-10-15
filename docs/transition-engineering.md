@@ -89,9 +89,14 @@ the polling delay alone therefore cannot produce a continuous transition.
 No resolution or HDMI mode change was logged. `CVideoSyncGbm::Setup` did reopen during the
 boundary, so the display path cannot yet be excluded entirely.
 
+The user reports that the visible black interval in the prior equivalent test felt slightly under
+one second and lasted only a split second. That observation is consistent with the measured 708 ms
+callback-to-A/V interval, but it is not a frame-accurate display measurement.
+
 ### Not yet demonstrated on the target Pi
 
-- The relationship between `onAVStarted()` and the first frame actually visible on the television.
+- The frame-accurate relationship between `onAVStarted()` and the first frame actually visible on
+  the television. The user-observed duration is already consistent with the measured timeline.
 - Whether any portion of the visible interval occurs in display synchronization despite no logged
   resolution or HDMI mode change.
 - How a streamed transition compares with the measured cached transition.
@@ -119,8 +124,9 @@ These are alternatives, not decisions:
    overlays, but it has the largest hardware-decoding, lifecycle, and packaging
    surface.
 
-No candidate should be implemented until the measured log timeline is correlated with visible
-output and the cached result is compared with one streamed transition.
+No candidate should be implemented until the cached result is compared with one streamed
+transition. External frame-accurate recording remains useful for validating a final implementation,
+but it is not a prerequisite for architecture selection.
 
 ## Regression harness
 
