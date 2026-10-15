@@ -50,6 +50,7 @@ def install():
     xbmc.LOGDEBUG = 0
     xbmc.LOGWARNING = 1
     xbmc.LOGERROR = 2
+    xbmc.LOGINFO = 3
     xbmc.Monitor = DummyMonitor
     xbmc.Player = object
     xbmc.log = lambda *args, **kwargs: None

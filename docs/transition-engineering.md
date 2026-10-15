@@ -115,7 +115,7 @@ cache behavior, and item selection.
 
 ## Diagnostic event timeline
 
-The diagnostic build emits Kodi debug-log entries prefixed with
+The diagnostic build emits Kodi log entries at `LOGINFO` prefixed with
 `[Aerial transition]`. Each entry contains a session-relative monotonic time, a
 sequence number, an event name, and only the minimum metadata needed for the
 test. It records whether an item is streamed or local, but deliberately does not

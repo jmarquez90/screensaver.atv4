@@ -129,7 +129,7 @@ class PlaybackHandoffContractTests(unittest.TestCase):
                 "[Aerial transition] seq=1 elapsed_ms=250.000 "
                 "event=play-requested index=4 source=stream"
             ),
-            level=atv.xbmc.LOGDEBUG,
+            level=atv.xbmc.LOGINFO,
         )
 
 

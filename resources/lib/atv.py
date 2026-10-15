@@ -45,7 +45,7 @@ class TransitionDiagnostics:
             )
             if details:
                 message = f"{message} {details}"
-            xbmc.log(msg=message, level=xbmc.LOGDEBUG)
+            xbmc.log(msg=message, level=xbmc.LOGINFO)
 
 
 class TransitionPlayer(xbmc.Player):
