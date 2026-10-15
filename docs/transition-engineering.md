@@ -1,6 +1,6 @@
 # Smooth random transitions: engineering baseline
 
-Status: baseline checkpoint; no transition fix is implemented here.
+Status: diagnostic checkpoint deployed; no transition fix is implemented here.
 
 ## Non-negotiable behavior
 
@@ -61,10 +61,40 @@ next item, including demux/input and render-buffer state. A Kodi playlist still
 crosses that item boundary; it does not provide two simultaneously prepared
 video frames for a moving crossfade.
 
+### Demonstrated by the target-Pi diagnostic checkpoint
+
+The committed diagnostic build (`5dd818a`) was deployed to LibreELEC 12.2.1 / Kodi 21.3. Its
+`resources/lib/atv.py` SHA-256 was verified as
+`e10e010a772003d438e68ba3544af0a6b08abb632400e96ea64e63e71348449a` before activation. A natural
+transition between two locally cached H.264 Aerial videos produced this timeline:
+
+| Event | Session time | Delta |
+| --- | ---: | ---: |
+| `playback-ended` | 190196.588 ms | — |
+| `stopped-observed` | 190452.682 ms | 256.094 ms |
+| `play-requested` | 190452.884 ms | 0.202 ms |
+| `play-returned` | 190452.999 ms | 0.115 ms |
+| `av-started` | 190904.298 ms | 451.414 ms from request |
+
+Kodi logged demuxer EOF at `16:45:32.212`, followed by queue drain, video-thread exit, codec
+deletion, and file close. After the add-on requested the successor, Kodi opened the local file,
+created a new input stream and demuxer, opened the DRM PRIME V4L2 H.264 decoder, and created a new
+video thread before `onAVStarted()` fired.
+
+The result demonstrates two independent contributors with network transfer absent: 256 ms in the
+add-on's polling handoff and 451 ms between the next request and Kodi reporting A/V available. The
+total was 708 ms from `playback-ended` and approximately 1.12 seconds from demuxer EOF. Removing
+the polling delay alone therefore cannot produce a continuous transition.
+
+No resolution or HDMI mode change was logged. `CVideoSyncGbm::Setup` did reopen during the
+boundary, so the display path cannot yet be excluded entirely.
+
 ### Not yet demonstrated on the target Pi
 
-- Whether the visible black interval is wholly inside Kodi's renderer teardown,
-  or renderer teardown plus display-mode/HDMI resynchronization.
+- The relationship between `onAVStarted()` and the first frame actually visible on the television.
+- Whether any portion of the visible interval occurs in display synchronization despite no logged
+  resolution or HDMI mode change.
+- How a streamed transition compares with the measured cached transition.
 - Whether identical codec, resolution, frame-rate, color-space, and HDR metadata
   materially reduce the gap on this exact display chain.
 - Whether Kodi exposes a usable final decoded frame during teardown.
@@ -89,8 +119,8 @@ These are alternatives, not decisions:
    overlays, but it has the largest hardware-decoding, lifecycle, and packaging
    surface.
 
-No candidate should be implemented until the target-Pi measurement separates
-the add-on polling delay, Kodi item teardown, and any HDMI/display-mode delay.
+No candidate should be implemented until the measured log timeline is correlated with visible
+output and the cached result is compared with one streamed transition.
 
 ## Regression harness
 
@@ -109,9 +139,8 @@ current contract at the future replacement seam:
 - the successor `play()` request happens only after the polling loop observes a
   stopped player.
 
-Later checkpoints should add an instrumented Pi test before changing the
-playback implementation, then retain these tests as protection for randomness,
-cache behavior, and item selection.
+The instrumented Pi checkpoint is complete. Retain these tests as protection for randomness,
+cache behavior, and item selection while the visual and streamed comparison checkpoints proceed.
 
 ## Diagnostic event timeline
 
