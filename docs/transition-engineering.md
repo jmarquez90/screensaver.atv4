@@ -112,3 +112,25 @@ current contract at the future replacement seam:
 Later checkpoints should add an instrumented Pi test before changing the
 playback implementation, then retain these tests as protection for randomness,
 cache behavior, and item selection.
+
+## Diagnostic event timeline
+
+The diagnostic build emits Kodi debug-log entries prefixed with
+`[Aerial transition]`. Each entry contains a session-relative monotonic time, a
+sequence number, an event name, and only the minimum metadata needed for the
+test. It records whether an item is streamed or local, but deliberately does not
+record its URL or filesystem path.
+
+The relevant intervals are:
+
+| Start event | End event | What the interval measures |
+| --- | --- | --- |
+| `playback-ended` | `stopped-observed` | The add-on's polling/scheduling contribution |
+| `stopped-observed` | `play-requested` | The add-on's selection and dispatch contribution |
+| `play-requested` | `av-started` | Kodi input, demux, decode, and renderer startup |
+
+`play-returned` only records when the Python call returns; it does not claim that
+a decoded frame is visible. Kodi callbacks likewise cannot prove what the display
+is showing. The Pi test must pair this timeline with an external recording of the
+screen, because the prior screenshot path did not capture a PNG and may not see
+the hardware video plane.
