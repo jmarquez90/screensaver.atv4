@@ -1,5 +1,13 @@
+"""
+   Copyright (C) 2026 Jeremiah Steven Marquez <jmarquez90@gmail.com>
+   This file is part of screensaver.atv4 - https://github.com/enen92/screensaver.atv4
+
+   SPDX-License-Identifier: GPL-2.0-only
+   See LICENSE for more information.
+"""
+
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from kodi_stubs import install
 
@@ -119,6 +127,37 @@ class PlaybackHandoffContractTests(unittest.TestCase):
 
         played_items = [event[1] for event in events if event[0] == "play"]
         self.assertEqual(["first.mov", "second.mov", "first.mov"], played_items)
+
+    def test_prefers_continuous_transport_when_ffmpeg_is_available(self):
+        subject, _, _ = self.make_screensaver(["first.mov", "second.mov"], 1)
+        continuous_stream = Mock()
+        continuous_stream.is_available.return_value = True
+        subject.start_continuous_playback = Mock()
+        subject.start_direct_playback = Mock()
+
+        with patch.object(atv, "ContinuousStream", return_value=continuous_stream):
+            subject.start_playback()
+
+        subject.start_continuous_playback.assert_called_once_with(continuous_stream)
+        subject.start_direct_playback.assert_not_called()
+
+    def test_intentional_shutdown_does_not_start_direct_fallback(self):
+        subject, _, _ = self.make_screensaver(["first.mov", "second.mov"], 1)
+        continuous_stream = Mock()
+        continuous_stream.is_available.return_value = True
+        subject.start_direct_playback = Mock()
+
+        def stop_during_continuous_playback(_stream):
+            subject.active = False
+            raise RuntimeError("continuous FFmpeg process exited")
+
+        subject.start_continuous_playback = stop_during_continuous_playback
+
+        with patch.object(atv, "ContinuousStream", return_value=continuous_stream):
+            subject.start_playback()
+
+        continuous_stream.stop.assert_called_once_with()
+        subject.start_direct_playback.assert_not_called()
 
     def test_player_callbacks_are_recorded_without_controlling_playback(self):
         diagnostics = RecordingDiagnostics()

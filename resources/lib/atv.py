@@ -1,5 +1,6 @@
 """
    Copyright (C) 2015- enen92
+   Copyright (C) 2026 Jeremiah Steven Marquez <jmarquez90@gmail.com>
    This file is part of screensaver.atv4 - https://github.com/enen92/screensaver.atv4
 
    SPDX-License-Identifier: GPL-2.0-only
@@ -16,6 +17,7 @@ import xbmc
 import xbmcgui
 
 from .commonatv import translate, addon, addon_path
+from .continuous import ContinuousStream
 from .offline import offline
 from .playlist import AtvPlaylist
 from .trans import ScreensaverTrans
@@ -152,6 +154,7 @@ class Screensaver(xbmcgui.WindowXML):
         self.isDPMSactive = bool(self.DPMStime > 0)
         self.active = True
         self.atv4player = None
+        self.continuous_stream = None
         self.transition_diagnostics = TransitionDiagnostics()
         self.video_playlist = AtvPlaylist().compute_playlist_array()
         xbmc.log(msg=f"kodi dpms time: {self.DPMStime}", level=xbmc.LOGDEBUG)
@@ -247,6 +250,8 @@ class Screensaver(xbmcgui.WindowXML):
         self.active = False
         if self.atv4player:
             self.atv4player.stop()
+        if self.continuous_stream:
+            self.continuous_stream.stop()
         self.close()
 
     def onAction(self, action):
@@ -254,6 +259,45 @@ class Screensaver(xbmcgui.WindowXML):
         self.clearAll()
 
     def start_playback(self):
+        continuous_stream = ContinuousStream(self.video_playlist)
+        if continuous_stream.is_available():
+            try:
+                self.start_continuous_playback(continuous_stream)
+                return
+            except Exception as exc:
+                continuous_stream.stop()
+                self.continuous_stream = None
+                if not self.active or monitor.abortRequested():
+                    return
+                xbmc.log(
+                    msg=(
+                        "[Aerial Screensaver] Continuous playback failed; "
+                        "using direct playback: {}"
+                    ).format(type(exc).__name__),
+                    level=xbmc.LOGWARNING,
+                )
+
+        self.start_direct_playback()
+
+    def start_continuous_playback(self, continuous_stream):
+        self.continuous_stream = continuous_stream
+        stream_url = continuous_stream.start()
+        self.transition_diagnostics.record(
+            "continuous-stream-started", playlist_count=len(self.video_playlist)
+        )
+        self.atv4player.set_active_item("continuous-stream.ts")
+        self.atv4player.play(stream_url, windowed=True)
+
+        while self.active and not monitor.abortRequested():
+            monitor.waitForAbort(1)
+            if not self.active or monitor.abortRequested():
+                break
+            if self.atv4player.isPlaying():
+                self.atv4player.record_progress_sample()
+            elif not continuous_stream.is_running():
+                raise RuntimeError("continuous FFmpeg process exited")
+
+    def start_direct_playback(self):
         self.playindex = 0
         active_item = self.video_playlist[self.playindex]
         active_asset_id = playback_asset_id(active_item)
