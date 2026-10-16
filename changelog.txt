@@ -1,5 +1,6 @@
 Unreleased
 - Add independent, opt-in time, date, and Kodi-weather overlays
+- Use Kodi's provider-independent weather labels for refresh, localization, and unit conversion
 
 v3.1.0  (2026-10-16)
 - Add optional seamless transitions on LibreELEC using FFmpeg Tools

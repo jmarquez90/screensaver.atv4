@@ -115,8 +115,8 @@ class NativeOverlayTests(unittest.TestCase):
                 TIME_CONTROL_ID: "$INFO[System.Time]",
                 DATE_CONTROL_ID: "$INFO[System.Date]",
                 WEATHER_CONTROL_ID: (
-                    "$INFO[Window(Weather).Property(Current.Temperature)]"
-                    "$INFO[Window(Weather).Property(Current.Condition),  ·  ]"
+                    "$INFO[Weather.Temperature]"
+                    "$INFO[Weather.Conditions,  ·  ]"
                 ),
             }, labels)
 

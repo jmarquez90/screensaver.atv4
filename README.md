@@ -53,8 +53,10 @@ Download the versioned `screensaver.atv4` ZIP from [this fork's Releases page](h
 
 The unreleased overlay candidate adds separate **Show time**, **Show date**, and **Show weather**
 settings. All are off by default. Kodi supplies and updates the labels: time and date follow the
-user's regional formats, while weather comes from the provider configured in Kodi. Aerial adds no
-weather API, credential, refresh loop, Kodi patch, or text baked into the video.
+user's regional formats, while Kodi's public weather labels expose the temperature and current
+conditions from whichever provider is configured. The overlay is provider-independent;
+Open-Meteo is the initial live-test target. Aerial adds no weather API, credential, refresh loop,
+Kodi patch, or text baked into the video.
 
 Calendar data is not part of this candidate. It requires separate choices for data source,
 credentials, privacy, refresh cadence, and stale/offline behavior.

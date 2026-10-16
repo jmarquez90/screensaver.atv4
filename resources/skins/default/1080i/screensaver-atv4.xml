@@ -101,7 +101,7 @@
 			<shadowcolor>CC000000</shadowcolor>
 			<align>right</align>
 			<aligny>center</aligny>
-			<label>$INFO[Window(Weather).Property(Current.Temperature)]$INFO[Window(Weather).Property(Current.Condition),  ·  ]</label>
+			<label>$INFO[Weather.Temperature]$INFO[Weather.Conditions,  ·  ]</label>
 		</control>
    </controls>
 </window>
