@@ -34,6 +34,10 @@ class StoppedPlayer:
         self.events = events
         self.stop_after_plays = stop_after_plays
         self.play_count = 0
+        self.active_item = None
+
+    def set_active_item(self, item):
+        self.active_item = item
 
     def play(self, item, windowed=False):
         self.play_count += 1
@@ -44,6 +48,9 @@ class StoppedPlayer:
     def isPlaying(self):
         self.events.append(("isPlaying", False))
         return False
+
+    def record_progress_sample(self):
+        raise AssertionError("progress must not be sampled after playback stops")
 
 
 class PlaybackHandoffContractTests(unittest.TestCase):
@@ -75,11 +82,28 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         ], events)
         self.assertEqual([
             ("playback-loop-start", {"playlist_count": 2}),
-            ("play-requested", {"index": 0, "source": "local"}),
-            ("play-returned", {"index": 0}),
-            ("stopped-observed", {"index": 0}),
-            ("play-requested", {"index": 1, "source": "local"}),
-            ("play-returned", {"index": 1}),
+            ("play-requested", {
+                "asset_id": atv.playback_asset_id("first.mov"),
+                "index": 0,
+                "source": "local",
+            }),
+            ("play-returned", {
+                "asset_id": atv.playback_asset_id("first.mov"),
+                "index": 0,
+            }),
+            ("stopped-observed", {
+                "asset_id": atv.playback_asset_id("first.mov"),
+                "index": 0,
+            }),
+            ("play-requested", {
+                "asset_id": atv.playback_asset_id("second.mov"),
+                "index": 1,
+                "source": "local",
+            }),
+            ("play-returned", {
+                "asset_id": atv.playback_asset_id("second.mov"),
+                "index": 1,
+            }),
         ], diagnostic_events)
 
     def test_cycles_the_once_randomized_session_order(self):
@@ -99,6 +123,8 @@ class PlaybackHandoffContractTests(unittest.TestCase):
     def test_player_callbacks_are_recorded_without_controlling_playback(self):
         diagnostics = RecordingDiagnostics()
         player = atv.TransitionPlayer(diagnostics)
+        player.set_active_item("https://example.test/a.mov")
+        asset_id = atv.playback_asset_id("https://example.test/a.mov")
 
         player.onAVStarted()
         player.onPlayBackEnded()
@@ -106,16 +132,47 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         player.onPlayBackError()
 
         self.assertEqual([
-            ("av-started", {}),
-            ("playback-ended", {}),
-            ("playback-stopped", {}),
-            ("playback-error", {}),
+            ("av-started", {"asset_id": asset_id}),
+            ("playback-ended", {"asset_id": asset_id}),
+            ("playback-stopped", {"asset_id": asset_id}),
+            ("playback-error", {"asset_id": asset_id}),
         ], diagnostics.events)
 
     def test_source_classification_does_not_log_the_media_location(self):
         self.assertEqual("stream", atv.playback_source("https://example.test/a.mov"))
         self.assertEqual("stream", atv.playback_source("http://example.test/a.mov"))
         self.assertEqual("local", atv.playback_source("/storage/aerials/a.mov"))
+
+    def test_asset_id_matches_stream_and_cached_copy_without_exposing_location(self):
+        stream = "https://example.test/private/path/A%20Scene.mov?token=secret"
+        cached = "/storage/aerial-cache/A Scene.mov"
+
+        self.assertEqual(atv.playback_asset_id(stream), atv.playback_asset_id(cached))
+        self.assertNotIn("A Scene", atv.playback_asset_id(stream))
+        self.assertEqual(16, len(atv.playback_asset_id(stream)))
+
+    def test_progress_sampling_is_bounded_and_records_player_time(self):
+        diagnostics = RecordingDiagnostics()
+        player = atv.TransitionPlayer(diagnostics)
+        player.set_active_item("https://example.test/a.mov")
+        player.isPlayingVideo = lambda: True
+        player.getTime = lambda: 2.5
+        player.getTotalTime = lambda: 189.0
+
+        player.onAVStarted()
+        for _ in range(player.progress_sample_limit + 1):
+            player.record_progress_sample()
+
+        progress = [event for event in diagnostics.events
+                    if event[0] == "playback-progress"]
+        self.assertEqual(player.progress_sample_limit, len(progress))
+        self.assertEqual({
+            "asset_id": atv.playback_asset_id("https://example.test/a.mov"),
+            "sample": 0,
+            "time_s": "2.500",
+            "total_s": "189.000",
+            "video": "true",
+        }, progress[0][1])
 
     def test_diagnostics_emit_a_parseable_monotonic_timeline(self):
         timestamps = iter([1_000_000_000, 1_250_000_000])

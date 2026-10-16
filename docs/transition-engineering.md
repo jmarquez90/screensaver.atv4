@@ -120,10 +120,23 @@ and video thread and emitted `onAVStarted()`. When playback was stopped roughly 
 Kodi logged `OutputPicture - timeout waiting for buffer`. It did not emit the diagnostic
 `playback-error` callback.
 
-This is not evidence of a Kodi process crash. It demonstrates a streamed-successor stall after
-player setup and proves that `onAVStarted()` cannot be treated as a first-visible-frame signal—or
-even as proof that the decoder will deliver a visible frame. The exact cause of the missing output
-buffer remains unverified.
+This is not evidence of a Kodi process crash. It demonstrates a failed streamed handoff after
+player setup and proves that `onAVStarted()` cannot be treated as a first-visible-frame signal.
+
+Read-only follow-up analysis assigned stable opaque IDs to both assets. The failed streamed
+successor later played from the normal cache to its natural end, which weakens the hypothesis that
+the media asset is intrinsically unplayable. Both logged stream locations identify `.mov`, SDR,
+2K, AVC renditions, and Kodi opened both with codec ID 27 through the V4L2 H.264 wrapper. The INFO
+log does not expose authoritative dimensions, frame rate, color metadata, pixel format, bitrate,
+or container structure.
+
+Kodi's Omega source also narrows what the shutdown warning establishes. `OutputPicture` logs the
+warning when the render manager's buffer wait returns negatively, but player teardown sets the
+output-abort flag before stopping the video thread. Because this warning appeared only after
+`CloseFile()` began, it shows that the thread was in the picture-output path during shutdown; it
+does not prove that the output path was stalled for the preceding black interval. The current logs
+therefore do not distinguish post-start HTTP or demux starvation, lower-level retained decoder
+state, and rendering or video-plane output failure.
 
 After the test, Kodi was stopped, the original settings file was restored to its pre-test SHA-256,
 the catalog hash was confirmed unchanged, and Kodi was restarted. A cached launch then selected
@@ -136,8 +149,10 @@ launch was not independently confirmed.
   the television. The user-observed duration is already consistent with the measured timeline.
 - Whether any portion of the visible interval occurs in display synchronization despite no logged
   resolution or HDMI mode change.
-- Whether the streamed-successor output-buffer stall is reproducible and whether it is specific to
-  one asset, the HTTP source path, buffering, or V4L2 decoder state across the item boundary.
+- Whether the black streamed successor is reproducible and whether it follows the HTTP source
+  path, buffering, retained lower-level decoder state, or rendering/video-plane output across the
+  item boundary.
+- Whether Kodi playback time advances while the television remains black.
 - Whether identical codec, resolution, frame-rate, color-space, and HDR metadata
   materially reduce the gap on this exact display chain.
 - Whether Kodi exposes a usable final decoded frame during teardown.
@@ -163,7 +178,7 @@ These are alternatives, not decisions:
    surface.
 
 The cached and streamed timing checkpoints are complete, but no candidate should be implemented
-until the streamed-successor stall is isolated. External frame-accurate recording remains useful
+until the streamed-successor failure is isolated. External frame-accurate recording remains useful
 for validating a final implementation, but it is not a prerequisite for investigating this stall
 or comparing architecture boundaries.
 
@@ -185,15 +200,24 @@ current contract at the future replacement seam:
   stopped player.
 
 The instrumented cached and streamed checkpoints are complete. Retain these tests as protection
-for randomness, cache behavior, and item selection while the streamed-successor stall is isolated.
+for randomness, cache behavior, and item selection while the streamed-successor failure is
+isolated.
 
 ## Diagnostic event timeline
 
 The diagnostic build emits Kodi log entries at `LOGINFO` prefixed with
 `[Aerial transition]`. Each entry contains a session-relative monotonic time, a
 sequence number, an event name, and only the minimum metadata needed for the
-test. It records whether an item is streamed or local, but deliberately does not
-record its URL or filesystem path.
+test. It records whether an item is streamed or local and a stable 16-hex-character
+SHA-256 prefix derived from the selected asset basename. It deliberately does not
+record the basename, URL, query string, or filesystem path.
+
+The next diagnostic build also samples player state through the existing one-second supervision
+loop. After each `onAVStarted()` callback it records at most ten `playback-progress` events with
+the opaque asset ID, sample number, fractional playback time, total duration, and whether Kodi
+reports video playback. The sampler does not add a thread, change selection, or issue player
+commands. Its purpose is to separate an internally advancing player with black physical output
+from a player whose clock stops after nominal startup.
 
 The relevant intervals are:
 
@@ -202,10 +226,12 @@ The relevant intervals are:
 | `playback-ended` | `stopped-observed` | The add-on's polling/scheduling contribution |
 | `stopped-observed` | `play-requested` | The add-on's selection and dispatch contribution |
 | `play-requested` | `av-started` | Kodi input, demux, decode, and renderer startup |
+| successive `playback-progress` samples | — | Whether Kodi's playback clock advances after startup |
 
 `play-returned` only records when the Python call returns; it does not claim that
 a decoded frame is visible. The streamed checkpoint demonstrated that Kodi can emit
-`onAVStarted()` while the television remains black and later log an output-buffer timeout.
-Kodi callbacks therefore cannot prove what the display is showing. External recording remains
-useful for final visual validation, but direct observation and Kodi logs are sufficient to reject
-this streamed handoff as unsuccessful.
+`onAVStarted()` while the television remains black. The later teardown-time output-buffer warning
+does not establish the duration or cause of that black interval. Kodi callbacks therefore cannot
+prove what the display is showing. External recording remains useful for final visual validation,
+but direct observation and Kodi logs are sufficient to reject this streamed handoff as
+unsuccessful.

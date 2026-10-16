@@ -7,8 +7,10 @@
 """
 
 import json
+from hashlib import sha256
 import threading
 import time
+from urllib.parse import unquote, urlsplit
 
 import xbmc
 import xbmcgui
@@ -51,21 +53,74 @@ class TransitionDiagnostics:
 class TransitionPlayer(xbmc.Player):
     """Observe Kodi lifecycle callbacks for the transition timeline."""
 
+    progress_sample_limit = 10
+
     def __init__(self, diagnostics):
         super().__init__()
         self._diagnostics = diagnostics
+        self._state_lock = threading.Lock()
+        self._active_asset_id = "unknown"
+        self._progress_sample_index = 0
+        self._progress_samples_remaining = 0
+
+    def set_active_item(self, item):
+        with self._state_lock:
+            self._active_asset_id = playback_asset_id(item)
+            self._progress_sample_index = 0
+            self._progress_samples_remaining = 0
+
+    def _record_callback(self, event, start_progress_sampling=False):
+        with self._state_lock:
+            asset_id = self._active_asset_id
+            if start_progress_sampling:
+                self._progress_sample_index = 0
+                self._progress_samples_remaining = self.progress_sample_limit
+        self._diagnostics.record(event, asset_id=asset_id)
 
     def onAVStarted(self):
-        self._diagnostics.record("av-started")
+        self._record_callback("av-started", start_progress_sampling=True)
 
     def onPlayBackEnded(self):
-        self._diagnostics.record("playback-ended")
+        self._record_callback("playback-ended")
 
     def onPlayBackStopped(self):
-        self._diagnostics.record("playback-stopped")
+        self._record_callback("playback-stopped")
 
     def onPlayBackError(self):
-        self._diagnostics.record("playback-error")
+        self._record_callback("playback-error")
+
+    def record_progress_sample(self):
+        with self._state_lock:
+            if self._progress_samples_remaining <= 0:
+                return
+            asset_id = self._active_asset_id
+            sample = self._progress_sample_index
+            self._progress_sample_index += 1
+            self._progress_samples_remaining -= 1
+
+        try:
+            video = str(bool(self.isPlayingVideo())).lower()
+        except Exception:
+            video = "unavailable"
+
+        try:
+            time_s = f"{self.getTime():.3f}"
+        except Exception:
+            time_s = "unavailable"
+
+        try:
+            total_s = f"{self.getTotalTime():.3f}"
+        except Exception:
+            total_s = "unavailable"
+
+        self._diagnostics.record(
+            "playback-progress",
+            asset_id=asset_id,
+            sample=sample,
+            time_s=time_s,
+            total_s=total_s,
+            video=video,
+        )
 
 
 def playback_source(item):
@@ -73,6 +128,19 @@ def playback_source(item):
     if value.startswith(("http://", "https://")):
         return "stream"
     return "local"
+
+
+def playback_asset_id(item):
+    """Return a stable opaque ID without logging the media location."""
+    value = str(item)
+    if playback_source(value) == "stream":
+        path = urlsplit(value).path
+    else:
+        path = value
+    normalized_path = unquote(path).replace("\\", "/")
+    basename = normalized_path.rsplit("/", 1)[-1]
+    identity = basename or normalized_path
+    return sha256(identity.encode("utf-8")).hexdigest()[:16]
 
 
 class Screensaver(xbmcgui.WindowXML):
@@ -187,22 +255,32 @@ class Screensaver(xbmcgui.WindowXML):
 
     def start_playback(self):
         self.playindex = 0
+        active_item = self.video_playlist[self.playindex]
+        active_asset_id = playback_asset_id(active_item)
         self.transition_diagnostics.record(
             "playback-loop-start", playlist_count=len(self.video_playlist)
         )
+        self.atv4player.set_active_item(active_item)
         self.transition_diagnostics.record(
             "play-requested",
+            asset_id=active_asset_id,
             index=self.playindex,
-            source=playback_source(self.video_playlist[self.playindex]),
+            source=playback_source(active_item),
         )
-        self.atv4player.play(self.video_playlist[self.playindex], windowed=True)
-        self.transition_diagnostics.record("play-returned", index=self.playindex)
+        self.atv4player.play(active_item, windowed=True)
+        self.transition_diagnostics.record(
+            "play-returned", asset_id=active_asset_id, index=self.playindex
+        )
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)
             # If we finish playing the video
-            if not self.atv4player.isPlaying() and self.active:
+            if self.atv4player.isPlaying():
+                self.atv4player.record_progress_sample()
+            elif self.active:
                 self.transition_diagnostics.record(
-                    "stopped-observed", index=self.playindex
+                    "stopped-observed",
+                    asset_id=active_asset_id,
+                    index=self.playindex,
                 )
                 # Increment the iterator used to access the array or reset to 0
                 if self.playindex < len(self.video_playlist) - 1:
@@ -210,13 +288,19 @@ class Screensaver(xbmcgui.WindowXML):
                 else:
                     self.playindex = 0
                 # Using the updated iterator, start playing the next video
+                active_item = self.video_playlist[self.playindex]
+                active_asset_id = playback_asset_id(active_item)
+                self.atv4player.set_active_item(active_item)
                 self.transition_diagnostics.record(
                     "play-requested",
+                    asset_id=active_asset_id,
                     index=self.playindex,
-                    source=playback_source(self.video_playlist[self.playindex]),
+                    source=playback_source(active_item),
                 )
-                self.atv4player.play(self.video_playlist[self.playindex], windowed=True)
-                self.transition_diagnostics.record("play-returned", index=self.playindex)
+                self.atv4player.play(active_item, windowed=True)
+                self.transition_diagnostics.record(
+                    "play-returned", asset_id=active_asset_id, index=self.playindex
+                )
 
 
 def run(params=False):
