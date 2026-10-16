@@ -1,3 +1,11 @@
+"""
+   Copyright (C) 2026 Jeremiah Steven Marquez <jmarquez90@gmail.com>
+   This file is part of screensaver.atv4 - https://github.com/enen92/screensaver.atv4
+
+   SPDX-License-Identifier: GPL-2.0-only
+   See LICENSE for more information.
+"""
+
 import os
 import unittest
 from unittest.mock import Mock, patch

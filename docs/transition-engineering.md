@@ -1,3 +1,8 @@
+<!--
+Copyright (C) 2026 Jeremiah Steven Marquez <jmarquez90@gmail.com>
+SPDX-License-Identifier: GPL-2.0-only
+-->
+
 # Smooth random transitions: engineering baseline
 
 Status: cached and streamed diagnostic checkpoints completed; no transition fix is implemented here.
