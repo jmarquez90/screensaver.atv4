@@ -44,6 +44,10 @@ Other LibreELEC hardware and video-quality combinations may work but have not ye
 
 The initial screensaver startup may still briefly show a dark screen and loading spinner while Kodi opens and buffers the continuous stream. Once playback begins, transitions between videos remain inside the same Kodi player session.
 
+### Installing this fork's release
+
+Download the versioned `screensaver.atv4` ZIP from [this fork's Releases page](https://github.com/jmarquez90/screensaver.atv4/releases), then use Kodi's **Install from zip file** action. LibreELEC users who want seamless transitions must also install **FFmpeg Tools** from the LibreELEC add-on repository.
+
 ## Aerials History
 - When the Apple TV first came out with Aerials screensavers, Apple published a [V1 JSON manifest](http://a1.phobos.apple.com/us/r1000/000/Features/atv/AutumnResources/videos/entries.json) with all the different videos. Locations featured San Francisco, New York, China, Hong Kong, Greenland, Dubai, Los Angeles, and others. They were published in 1080p H.264 format
   - This JSON also included a `timeOfDay` key indicating if the video was shot during the day or night 
