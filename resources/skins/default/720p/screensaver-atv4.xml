@@ -64,5 +64,44 @@
 		    <height>720</height>
 		    <visible>true</visible>
 		</control>
+		<control type="label" id="32510">
+			<description>Time overlay</description>
+			<left>773</left>
+			<top>567</top>
+			<width>454</width>
+			<height>60</height>
+			<font>font13</font>
+			<textcolor>FFFFFFFF</textcolor>
+			<shadowcolor>CC000000</shadowcolor>
+			<align>right</align>
+			<aligny>center</aligny>
+			<label>$INFO[System.Time]</label>
+		</control>
+		<control type="label" id="32511">
+			<description>Date overlay</description>
+			<left>773</left>
+			<top>620</top>
+			<width>454</width>
+			<height>47</height>
+			<font>font11</font>
+			<textcolor>DDFFFFFF</textcolor>
+			<shadowcolor>CC000000</shadowcolor>
+			<align>right</align>
+			<aligny>center</aligny>
+			<label>$INFO[System.Date]</label>
+		</control>
+		<control type="label" id="32512">
+			<description>Weather overlay</description>
+			<left>773</left>
+			<top>520</top>
+			<width>454</width>
+			<height>40</height>
+			<font>font11</font>
+			<textcolor>DDFFFFFF</textcolor>
+			<shadowcolor>CC000000</shadowcolor>
+			<align>right</align>
+			<aligny>center</aligny>
+			<label>$INFO[Window(Weather).Property(Current.Temperature)]$INFO[Window(Weather).Property(Current.Condition),  ·  ]</label>
+		</control>
    </controls>
 </window>

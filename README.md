@@ -16,6 +16,7 @@ This addon adds the Apple Aerial screensavers to Kodi Entertainment Center. It c
   - 4K or 1080p resolution (1080p default)
   - High Dynamic Range (HDR) Dolby Vision or Standard Dynamic Range (SDR default)
 - Filtering of videos by location/scene
+- Optional, independently controlled time, date, and Kodi-weather overlays
 - Offline caching of selected video quality
   - Download location by location or all at once
   - Full offline mode to prevent all network calls, using only local videos and JSON
@@ -47,6 +48,16 @@ The initial screensaver startup may still briefly show a dark screen and loading
 ### Installing this fork's release
 
 Download the versioned `screensaver.atv4` ZIP from [this fork's Releases page](https://github.com/jmarquez90/screensaver.atv4/releases), then use Kodi's **Install from zip file** action. LibreELEC users who want seamless transitions must also install **FFmpeg Tools** from the LibreELEC add-on repository.
+
+## Optional overlays
+
+The unreleased overlay candidate adds separate **Show time**, **Show date**, and **Show weather**
+settings. All are off by default. Kodi supplies and updates the labels: time and date follow the
+user's regional formats, while weather comes from the provider configured in Kodi. Aerial adds no
+weather API, credential, refresh loop, Kodi patch, or text baked into the video.
+
+Calendar data is not part of this candidate. It requires separate choices for data source,
+credentials, privacy, refresh cadence, and stale/offline behavior.
 
 ## Aerials History
 - When the Apple TV first came out with Aerials screensavers, Apple published a [V1 JSON manifest](http://a1.phobos.apple.com/us/r1000/000/Features/atv/AutumnResources/videos/entries.json) with all the different videos. Locations featured San Francisco, New York, China, Hong Kong, Greenland, Dubai, Los Angeles, and others. They were published in 1080p H.264 format

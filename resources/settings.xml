@@ -119,6 +119,25 @@
 				</setting>
 			</group>
 		</category>
+		<category id="overlays" label="32133" help="">
+			<group id="1" label="32133">
+				<setting id="show-time-overlay" type="boolean" label="32134" help="32136">
+					<level>0</level>
+					<default>false</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="show-date-overlay" type="boolean" label="32135" help="32136">
+					<level>0</level>
+					<default>false</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="show-weather-overlay" type="boolean" label="32137" help="32138">
+					<level>0</level>
+					<default>false</default>
+					<control type="toggle"/>
+				</setting>
+			</group>
+		</category>
 		<category id="videos" label="32031" help="">
 			<group id="1">
 				<setting id="enable-africaandthemiddleeast" type="boolean" label="32081" help="">

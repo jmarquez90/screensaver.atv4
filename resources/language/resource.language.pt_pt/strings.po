@@ -441,3 +441,27 @@ msgstr "Ativar West Africa to the Alps"
 msgctxt "#32132"
 msgid "Enable Yosemite"
 msgstr "Ativar Yosemite"
+
+msgctxt "#32133"
+msgid "Overlays"
+msgstr "Sobreposições"
+
+msgctxt "#32134"
+msgid "Show time"
+msgstr "Mostrar hora"
+
+msgctxt "#32135"
+msgid "Show date"
+msgstr "Mostrar data"
+
+msgctxt "#32136"
+msgid "Uses Kodi's regional format settings"
+msgstr "Usa as definições regionais do Kodi"
+
+msgctxt "#32137"
+msgid "Show weather"
+msgstr "Mostrar meteorologia"
+
+msgctxt "#32138"
+msgid "Uses the weather provider configured in Kodi"
+msgstr "Usa o fornecedor de meteorologia configurado no Kodi"

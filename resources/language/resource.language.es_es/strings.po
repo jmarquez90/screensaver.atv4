@@ -442,3 +442,27 @@ msgctxt "#32132"
 msgid "Enable Yosemite"
 msgstr "Habilitar Yosemite"
 
+msgctxt "#32133"
+msgid "Overlays"
+msgstr "Superposiciones"
+
+msgctxt "#32134"
+msgid "Show time"
+msgstr "Mostrar hora"
+
+msgctxt "#32135"
+msgid "Show date"
+msgstr "Mostrar fecha"
+
+msgctxt "#32136"
+msgid "Uses Kodi's regional format settings"
+msgstr "Usa la configuración regional de Kodi"
+
+msgctxt "#32137"
+msgid "Show weather"
+msgstr "Mostrar tiempo"
+
+msgctxt "#32138"
+msgid "Uses the weather provider configured in Kodi"
+msgstr "Usa el proveedor meteorológico configurado en Kodi"
+

@@ -19,6 +19,7 @@ import xbmcgui
 from .commonatv import translate, addon, addon_path
 from .continuous import ContinuousStream
 from .offline import offline
+from .overlays import configure_overlays
 from .playlist import AtvPlaylist
 from .trans import ScreensaverTrans
 
@@ -163,6 +164,7 @@ class Screensaver(xbmcgui.WindowXML):
     def onInit(self):
         self.getControl(32502).setLabel(translate(32008))
         self.setProperty("screensaver-atv4-loading", "true")
+        configure_overlays(self, addon)
 
         if self.video_playlist:
             self.setProperty("screensaver-atv4-loading", "false")

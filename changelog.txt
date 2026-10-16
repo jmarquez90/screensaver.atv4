@@ -1,3 +1,6 @@
+Unreleased
+- Add independent, opt-in time, date, and Kodi-weather overlays
+
 v3.1.0  (2026-10-16)
 - Add optional seamless transitions on LibreELEC using FFmpeg Tools
 - Preserve randomized playback for online and locally cached Aerials
