@@ -298,7 +298,7 @@ class Screensaver(xbmcgui.WindowXML):
             "continuous-stream-started", playlist_count=len(self.video_playlist)
         )
         self.atv4player.set_active_item("continuous-stream.ts")
-        self.atv4player.play(stream_url, windowed=True)
+        self.atv4player.play(stream_url, windowed=False)
 
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)
@@ -323,7 +323,7 @@ class Screensaver(xbmcgui.WindowXML):
             index=self.playindex,
             source=playback_source(active_item),
         )
-        self.atv4player.play(active_item, windowed=True)
+        self.atv4player.play(active_item, windowed=False)
         self.transition_diagnostics.record(
             "play-returned", asset_id=active_asset_id, index=self.playindex
         )
@@ -353,7 +353,7 @@ class Screensaver(xbmcgui.WindowXML):
                     index=self.playindex,
                     source=playback_source(active_item),
                 )
-                self.atv4player.play(active_item, windowed=True)
+                self.atv4player.play(active_item, windowed=False)
                 self.transition_diagnostics.record(
                     "play-returned", asset_id=active_asset_id, index=self.playindex
                 )

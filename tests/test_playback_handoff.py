@@ -83,10 +83,10 @@ class PlaybackHandoffContractTests(unittest.TestCase):
             atv.monitor = original_monitor
 
         self.assertEqual([
-            ("play", "first.mov", True),
+            ("play", "first.mov", False),
             ("wait", 1),
             ("isPlaying", False),
-            ("play", "second.mov", True),
+            ("play", "second.mov", False),
         ], events)
         self.assertEqual([
             ("playback-loop-start", {"playlist_count": 2}),
@@ -127,6 +127,15 @@ class PlaybackHandoffContractTests(unittest.TestCase):
 
         played_items = [event[1] for event in events if event[0] == "play"]
         self.assertEqual(["first.mov", "second.mov", "first.mov"], played_items)
+
+    def test_continuous_transport_uses_fullscreen_playback(self):
+        subject, events, _ = self.make_screensaver(["first.mov"], 1)
+        continuous_stream = Mock()
+        continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
+
+        subject.start_continuous_playback(continuous_stream)
+
+        self.assertIn(("play", "udp://@127.0.0.1:12345", False), events)
 
     def test_prefers_continuous_transport_when_ffmpeg_is_available(self):
         subject, _, _ = self.make_screensaver(["first.mov", "second.mov"], 1)
