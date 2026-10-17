@@ -168,6 +168,21 @@ class PlaybackHandoffContractTests(unittest.TestCase):
             ("duplicate-init-ignored", {}),
         ], subject.transition_diagnostics.events)
 
+    def test_overlay_prebuffer_keeps_embedded_video_hidden(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.atv4player = None
+        subject.video_playlist = []
+        subject.overlay_requested = True
+        subject.setProperty = Mock()
+        subject.novideos = Mock()
+
+        subject.onInit()
+
+        subject.setProperty.assert_any_call(
+            subject.embedded_video_property,
+            "false",
+        )
+
     def test_fullscreen_exit_stops_the_continuous_session(self):
         subject = object.__new__(atv.Screensaver)
         subject.active = True

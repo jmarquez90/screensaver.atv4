@@ -161,6 +161,8 @@ def playback_asset_id(item):
 
 class Screensaver(xbmcgui.WindowXML):
 
+    embedded_video_property = "screensaver-atv4-video-visible"
+
     def __init__(self, *args, **kwargs):
         self.DPMStime = json.loads(xbmc.executeJSONRPC(
             '{"jsonrpc":"2.0","method":"Settings.GetSettingValue","params":{"setting":"powermanagement.displaysoff"},"id":2}'))[
@@ -182,6 +184,10 @@ class Screensaver(xbmcgui.WindowXML):
             return
 
         self.setProperty("screensaver-atv4-loading", "false")
+        self.setProperty(
+            self.embedded_video_property,
+            str(not self.overlay_requested).lower(),
+        )
 
         if self.video_playlist:
             self.setProperty("screensaver-atv4-loading", "false")
@@ -289,6 +295,7 @@ class Screensaver(xbmcgui.WindowXML):
             monitor.waitForAbort(0.05)
 
         self.transition_diagnostics.record("fullscreen-entry-timeout")
+        self.setProperty(self.embedded_video_property, "true")
 
     @classmethod
     def toTransparent(cls):
