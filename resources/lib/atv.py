@@ -167,6 +167,10 @@ class Screensaver(xbmcgui.WindowXML):
         xbmc.log(msg=f"kodi dpms active: {self.isDPMSactive}", level=xbmc.LOGDEBUG)
 
     def onInit(self):
+        if self.atv4player is not None:
+            self.transition_diagnostics.record("duplicate-init-ignored")
+            return
+
         self.getControl(32502).setLabel(translate(32008))
         self.setProperty("screensaver-atv4-loading", "true")
 
@@ -181,30 +185,32 @@ class Screensaver(xbmcgui.WindowXML):
             # Start player thread
             threading.Thread(target=self.start_playback).start()
 
-            # DPMS logic
-            self.max_allowed_time = None
-
-            if self.isDPMSactive and addon.getSettingInt("check-dpms") == 1:
-                self.max_allowed_time = self.DPMStime
-
-            elif addon.getSettingInt("check-dpms") == 2:
-                self.max_allowed_time = addon.getSettingInt("manual-dpms") * 60
-
-            xbmc.log(msg=f"check dpms: {addon.getSetting('check-dpms')}",
-                     level=xbmc.LOGDEBUG)
-            xbmc.log(msg=f"before supervision: {self.max_allowed_time}",
-                     level=xbmc.LOGDEBUG)
-
-            if self.max_allowed_time:
-                delta = 0
-                while self.active:
-                    if delta >= self.max_allowed_time:
-                        self.activateDPMS()
-                        break
-                    monitor.waitForAbort(1)
-                    delta += 1
+            self._supervise_dpms()
         else:
             self.novideos()
+
+    def _supervise_dpms(self):
+        self.max_allowed_time = None
+        if self.isDPMSactive and addon.getSettingInt("check-dpms") == 1:
+            self.max_allowed_time = self.DPMStime
+        elif addon.getSettingInt("check-dpms") == 2:
+            self.max_allowed_time = addon.getSettingInt("manual-dpms") * 60
+
+        xbmc.log(msg=f"check dpms: {addon.getSetting('check-dpms')}",
+                 level=xbmc.LOGDEBUG)
+        xbmc.log(msg=f"before supervision: {self.max_allowed_time}",
+                 level=xbmc.LOGDEBUG)
+
+        if not self.max_allowed_time:
+            return
+
+        delta = 0
+        while self.active:
+            if delta >= self.max_allowed_time:
+                self.activateDPMS()
+                break
+            monitor.waitForAbort(1)
+            delta += 1
 
     def activateDPMS(self):
         xbmc.log(msg="[Aerial Screensaver] Manually activating DPMS!", level=xbmc.LOGDEBUG)
@@ -298,12 +304,24 @@ class Screensaver(xbmcgui.WindowXML):
             "continuous-stream-started", playlist_count=len(self.video_playlist)
         )
         self.atv4player.set_active_item("continuous-stream.ts")
-        self.atv4player.play(stream_url, windowed=False)
+        fullscreen_playback = bool(self.overlay_path)
+        fullscreen_seen = False
+        self.atv4player.play(stream_url, windowed=not fullscreen_playback)
 
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)
             if not self.active or monitor.abortRequested():
                 break
+            if fullscreen_playback:
+                fullscreen_active = xbmc.getCondVisibility(
+                    "Window.IsActive(fullscreenvideo)"
+                )
+                if fullscreen_active:
+                    fullscreen_seen = True
+                elif fullscreen_seen:
+                    self.transition_diagnostics.record("fullscreen-exited")
+                    self.clearAll()
+                    break
             if self.atv4player.isPlaying():
                 self.atv4player.record_progress_sample()
             elif not continuous_stream.is_running():
@@ -323,7 +341,7 @@ class Screensaver(xbmcgui.WindowXML):
             index=self.playindex,
             source=playback_source(active_item),
         )
-        self.atv4player.play(active_item, windowed=False)
+        self.atv4player.play(active_item, windowed=True)
         self.transition_diagnostics.record(
             "play-returned", asset_id=active_asset_id, index=self.playindex
         )
@@ -353,7 +371,7 @@ class Screensaver(xbmcgui.WindowXML):
                     index=self.playindex,
                     source=playback_source(active_item),
                 )
-                self.atv4player.play(active_item, windowed=False)
+                self.atv4player.play(active_item, windowed=True)
                 self.transition_diagnostics.record(
                     "play-returned", asset_id=active_asset_id, index=self.playindex
                 )

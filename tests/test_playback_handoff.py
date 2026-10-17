@@ -83,10 +83,10 @@ class PlaybackHandoffContractTests(unittest.TestCase):
             atv.monitor = original_monitor
 
         self.assertEqual([
-            ("play", "first.mov", False),
+            ("play", "first.mov", True),
             ("wait", 1),
             ("isPlaying", False),
-            ("play", "second.mov", False),
+            ("play", "second.mov", True),
         ], events)
         self.assertEqual([
             ("playback-loop-start", {"playlist_count": 2}),
@@ -130,12 +130,66 @@ class PlaybackHandoffContractTests(unittest.TestCase):
 
     def test_continuous_transport_uses_fullscreen_playback(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
+        subject.overlay_path = "/tmp/aerial-overlay.ass"
         continuous_stream = Mock()
         continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
 
         subject.start_continuous_playback(continuous_stream)
 
         self.assertIn(("play", "udp://@127.0.0.1:12345", False), events)
+
+    def test_continuous_transport_stays_windowed_without_an_overlay(self):
+        subject, events, _ = self.make_screensaver(["first.mov"], 1)
+        subject.overlay_path = None
+        continuous_stream = Mock()
+        continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
+
+        subject.start_continuous_playback(continuous_stream)
+
+        self.assertIn(("play", "udp://@127.0.0.1:12345", True), events)
+
+    def test_ignores_duplicate_init_after_fullscreen_video_exits(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.atv4player = Mock()
+        subject.transition_diagnostics = RecordingDiagnostics()
+
+        subject.onInit()
+
+        self.assertEqual([
+            ("duplicate-init-ignored", {}),
+        ], subject.transition_diagnostics.events)
+
+    def test_fullscreen_exit_stops_the_continuous_session(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject.video_playlist = ["first.mov"]
+        subject.overlay_path = "/tmp/aerial-overlay.ass"
+        subject.atv4player = Mock()
+        subject.atv4player.isPlaying.return_value = True
+        subject.transition_diagnostics = RecordingDiagnostics()
+        subject.clearAll = Mock()
+        continuous_stream = Mock()
+        continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
+
+        fullscreen_states = iter([False, True, False])
+        with patch.object(
+            atv.xbmc,
+            "getCondVisibility",
+            side_effect=lambda _condition: next(fullscreen_states),
+            create=True,
+        ):
+            original_monitor = atv.monitor
+            atv.monitor = RecordingMonitor([])
+            try:
+                subject.start_continuous_playback(continuous_stream)
+            finally:
+                atv.monitor = original_monitor
+
+        subject.clearAll.assert_called_once_with()
+        self.assertIn(
+            ("fullscreen-exited", {}),
+            subject.transition_diagnostics.events,
+        )
 
     def test_prefers_continuous_transport_when_ffmpeg_is_available(self):
         subject, _, _ = self.make_screensaver(["first.mov", "second.mov"], 1)
