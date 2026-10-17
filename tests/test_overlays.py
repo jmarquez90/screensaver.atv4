@@ -120,6 +120,16 @@ class NativeOverlayTests(unittest.TestCase):
                 ),
             }, labels)
 
+    def test_both_layouts_leave_the_video_plane_transparent(self):
+        root = Path(__file__).resolve().parents[1]
+        for resolution in ("720p", "1080i"):
+            layout = ElementTree.parse(
+                root / "resources" / "skins" / "default" / resolution
+                / "screensaver-atv4.xml"
+            )
+
+            self.assertEqual("0", layout.getroot().findtext("backgroundcolor"))
+
 
 if __name__ == "__main__":
     unittest.main()
