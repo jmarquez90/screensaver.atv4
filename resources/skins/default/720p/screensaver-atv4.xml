@@ -62,7 +62,7 @@
 		    <posy>0</posy>
 		    <width>1280</width>
 		    <height>720</height>
-		    <visible>String.IsEqual(Window.Property(screensaver-atv4-video-visible),"true")</visible>
+		    <visible>true</visible>
 		</control>
    </controls>
 </window>
