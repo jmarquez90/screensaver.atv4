@@ -85,6 +85,7 @@ class TransitionPlayer(xbmc.Player):
         self._record_callback("av-started", start_progress_sampling=True)
         if self._overlay_path:
             self.setSubtitles(self._overlay_path)
+            self.showSubtitles(True)
 
     def onPlayBackEnded(self):
         self._record_callback("playback-ended")

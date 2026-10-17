@@ -203,10 +203,12 @@ class PlaybackHandoffContractTests(unittest.TestCase):
             "/tmp/aerial-overlay.ass",
         )
         player.setSubtitles = Mock()
+        player.showSubtitles = Mock()
 
         player.onAVStarted()
 
         player.setSubtitles.assert_called_once_with("/tmp/aerial-overlay.ass")
+        player.showSubtitles.assert_called_once_with(True)
 
     def test_source_classification_does_not_log_the_media_location(self):
         self.assertEqual("stream", atv.playback_source("https://example.test/a.mov"))
