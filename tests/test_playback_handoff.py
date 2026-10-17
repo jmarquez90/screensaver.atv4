@@ -129,15 +129,15 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         played_items = [event[1] for event in events if event[0] == "play"]
         self.assertEqual(["first.mov", "second.mov", "first.mov"], played_items)
 
-    def test_direct_fallback_prebuffers_windowed_when_overlay_is_requested(self):
+    def test_direct_fallback_starts_fullscreen_when_overlay_is_requested(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
         subject.overlay_requested = True
 
         subject.start_direct_playback()
 
-        self.assertIn(("play", "first.mov", True), events)
+        self.assertIn(("play", "first.mov", False), events)
 
-    def test_continuous_transport_prebuffers_windowed_for_overlay_handoff(self):
+    def test_continuous_transport_starts_fullscreen_when_overlay_is_requested(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
         subject.overlay_requested = True
         continuous_stream = Mock()
@@ -145,7 +145,7 @@ class PlaybackHandoffContractTests(unittest.TestCase):
 
         subject.start_continuous_playback(continuous_stream)
 
-        self.assertIn(("play", "udp://@127.0.0.1:12345", True), events)
+        self.assertIn(("play", "udp://@127.0.0.1:12345", False), events)
 
     def test_continuous_transport_stays_windowed_without_an_overlay(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
@@ -302,6 +302,25 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         subject._show_overlays.assert_called_once_with()
         self.assertEqual([
             ("fullscreen-entry-requested", {}),
+            ("fullscreen-entered", {}),
+        ], subject.transition_diagnostics.events)
+
+    def test_presentation_opens_overlay_without_toggling_when_already_fullscreen(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject._show_overlays = Mock()
+        subject.transition_diagnostics = RecordingDiagnostics()
+
+        with patch.object(
+            atv.xbmc,
+            "getCondVisibility",
+            return_value=True,
+        ), patch.object(atv.xbmc, "executebuiltin") as execute_builtin:
+            subject._present_playback()
+
+        execute_builtin.assert_not_called()
+        subject._show_overlays.assert_called_once_with()
+        self.assertEqual([
             ("fullscreen-entered", {}),
         ], subject.transition_diagnostics.events)
 

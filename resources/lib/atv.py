@@ -356,7 +356,7 @@ class Screensaver(xbmcgui.WindowXML):
         self.atv4player.set_active_item("continuous-stream.ts")
         fullscreen_playback = self.overlay_requested
         fullscreen_seen = False
-        self.atv4player.play(stream_url, windowed=True)
+        self.atv4player.play(stream_url, windowed=not fullscreen_playback)
 
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)
@@ -383,7 +383,7 @@ class Screensaver(xbmcgui.WindowXML):
             index=self.playindex,
             source=playback_source(active_item),
         )
-        self.atv4player.play(active_item, windowed=True)
+        self.atv4player.play(active_item, windowed=not self.overlay_requested)
         self.transition_diagnostics.record(
             "play-returned", asset_id=active_asset_id, index=self.playindex
         )
