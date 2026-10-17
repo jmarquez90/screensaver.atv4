@@ -12,13 +12,22 @@ DATE_CONTROL_ID = 32511
 WEATHER_CONTROL_ID = 32512
 
 
-def configure_overlays(window, settings):
-    """Apply opt-in visibility while Kodi owns the displayed information."""
-    visibility = {
+def overlay_visibility(settings):
+    """Read the three independent opt-in overlay settings."""
+    return {
         TIME_CONTROL_ID: settings.getSettingBool("show-time-overlay"),
         DATE_CONTROL_ID: settings.getSettingBool("show-date-overlay"),
         WEATHER_CONTROL_ID: settings.getSettingBool("show-weather-overlay"),
     }
+
+
+def overlays_enabled(settings):
+    return any(overlay_visibility(settings).values())
+
+
+def configure_overlays(window, settings):
+    """Apply opt-in visibility while Kodi owns the displayed information."""
+    visibility = overlay_visibility(settings)
     for control_id, visible in visibility.items():
         window.getControl(control_id).setVisible(visible)
     return visibility

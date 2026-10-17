@@ -159,6 +159,22 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         continuous_stream.stop.assert_called_once_with()
         subject.start_direct_playback.assert_not_called()
 
+    def test_shutdown_closes_overlay_and_stops_playback_resources(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject.overlay_window = Mock()
+        subject.atv4player = Mock()
+        subject.continuous_stream = Mock()
+        subject.close = Mock()
+
+        subject.clearAll()
+
+        self.assertFalse(subject.active)
+        self.assertIsNone(subject.overlay_window)
+        subject.atv4player.stop.assert_called_once_with()
+        subject.continuous_stream.stop.assert_called_once_with()
+        subject.close.assert_called_once_with()
+
     def test_player_callbacks_are_recorded_without_controlling_playback(self):
         diagnostics = RecordingDiagnostics()
         player = atv.TransitionPlayer(diagnostics)

@@ -19,7 +19,7 @@ import xbmcgui
 from .commonatv import translate, addon, addon_path
 from .continuous import ContinuousStream
 from .offline import offline
-from .overlays import configure_overlays
+from .overlays import configure_overlays, overlays_enabled
 from .playlist import AtvPlaylist
 from .trans import ScreensaverTrans
 
@@ -126,6 +126,13 @@ class TransitionPlayer(xbmc.Player):
         )
 
 
+class OverlayWindow(xbmcgui.WindowXMLDialog):
+    """Show Kodi-owned information above the unchanged video window."""
+
+    def onInit(self):
+        configure_overlays(self, addon)
+
+
 def playback_source(item):
     value = str(item).lower()
     if value.startswith(("http://", "https://")):
@@ -156,6 +163,7 @@ class Screensaver(xbmcgui.WindowXML):
         self.active = True
         self.atv4player = None
         self.continuous_stream = None
+        self.overlay_window = None
         self.transition_diagnostics = TransitionDiagnostics()
         self.video_playlist = AtvPlaylist().compute_playlist_array()
         xbmc.log(msg=f"kodi dpms time: {self.DPMStime}", level=xbmc.LOGDEBUG)
@@ -164,10 +172,10 @@ class Screensaver(xbmcgui.WindowXML):
     def onInit(self):
         self.getControl(32502).setLabel(translate(32008))
         self.setProperty("screensaver-atv4-loading", "true")
-        configure_overlays(self, addon)
 
         if self.video_playlist:
             self.setProperty("screensaver-atv4-loading", "false")
+            self._show_overlays()
             self.atv4player = TransitionPlayer(self.transition_diagnostics)
 
             # Start player thread
@@ -197,6 +205,17 @@ class Screensaver(xbmcgui.WindowXML):
                     delta += 1
         else:
             self.novideos()
+
+    def _show_overlays(self):
+        if not overlays_enabled(addon):
+            return
+        self.overlay_window = OverlayWindow(
+            'screensaver-atv4-overlays.xml',
+            addon_path,
+            'default',
+            '',
+        )
+        self.overlay_window.show()
 
     def activateDPMS(self):
         xbmc.log(msg="[Aerial Screensaver] Manually activating DPMS!", level=xbmc.LOGDEBUG)
@@ -250,6 +269,9 @@ class Screensaver(xbmcgui.WindowXML):
 
     def clearAll(self, close=True):
         self.active = False
+        if self.overlay_window:
+            self.overlay_window.close()
+            self.overlay_window = None
         if self.atv4player:
             self.atv4player.stop()
         if self.continuous_stream:

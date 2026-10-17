@@ -15,6 +15,7 @@ from resources.lib.overlays import (
     TIME_CONTROL_ID,
     WEATHER_CONTROL_ID,
     configure_overlays,
+    overlays_enabled,
 )
 
 
@@ -75,6 +76,12 @@ class NativeOverlayTests(unittest.TestCase):
         self.assertFalse(window.controls[DATE_CONTROL_ID].visible)
         self.assertFalse(window.controls[WEATHER_CONTROL_ID].visible)
 
+    def test_overlay_window_is_only_needed_when_a_setting_is_enabled(self):
+        self.assertFalse(overlays_enabled(FakeSettings()))
+        self.assertTrue(overlays_enabled(FakeSettings(**{
+            "show-date-overlay": True,
+        })))
+
     def test_public_settings_are_opt_in(self):
         root = Path(__file__).resolve().parents[1]
         settings = ElementTree.parse(root / "resources" / "settings.xml")
@@ -99,7 +106,7 @@ class NativeOverlayTests(unittest.TestCase):
         for resolution in ("720p", "1080i"):
             layout = ElementTree.parse(
                 root / "resources" / "skins" / "default" / resolution
-                / "screensaver-atv4.xml"
+                / "screensaver-atv4-overlays.xml"
             )
             labels = {
                 int(control.attrib["id"]): control.findtext("label")
@@ -120,15 +127,40 @@ class NativeOverlayTests(unittest.TestCase):
                 ),
             }, labels)
 
-    def test_both_layouts_leave_the_video_plane_transparent(self):
+    def test_overlay_dialogs_are_transparent_and_modeless(self):
         root = Path(__file__).resolve().parents[1]
+        for resolution in ("720p", "1080i"):
+            layout = ElementTree.parse(
+                root / "resources" / "skins" / "default" / resolution
+                / "screensaver-atv4-overlays.xml"
+            )
+
+            self.assertEqual("0", layout.getroot().findtext("backgroundcolor"))
+            self.assertEqual("dialog", layout.getroot().attrib["type"])
+            self.assertEqual("modeless", layout.getroot().attrib["modality"])
+
+    def test_main_video_layouts_do_not_contain_overlay_controls(self):
+        root = Path(__file__).resolve().parents[1]
+        overlay_ids = {
+            str(TIME_CONTROL_ID),
+            str(DATE_CONTROL_ID),
+            str(WEATHER_CONTROL_ID),
+        }
         for resolution in ("720p", "1080i"):
             layout = ElementTree.parse(
                 root / "resources" / "skins" / "default" / resolution
                 / "screensaver-atv4.xml"
             )
+            controls = layout.findall(".//control")
 
-            self.assertEqual("0", layout.getroot().findtext("backgroundcolor"))
+            self.assertTrue(any(
+                control.attrib.get("type") == "videowindow"
+                for control in controls
+            ))
+            self.assertFalse(any(
+                control.attrib.get("id") in overlay_ids
+                for control in controls
+            ))
 
 
 if __name__ == "__main__":
