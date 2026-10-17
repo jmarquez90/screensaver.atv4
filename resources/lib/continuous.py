@@ -97,7 +97,8 @@ class ContinuousStream:
 
         self.manifest_path = write_concat_manifest(self.items)
         port = reserve_udp_port()
-        self.playback_url = "udp://@127.0.0.1:{}".format(port)
+        # removed the '@' symbol because FFmpeg has different format
+        self.playback_url = "udp://127.0.0.1:{}".format(port)
         try:
             self.process = self.process_factory(
                 self._command(port),

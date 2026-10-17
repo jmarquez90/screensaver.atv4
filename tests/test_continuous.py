@@ -81,7 +81,8 @@ class ContinuousStreamTests(unittest.TestCase):
             playback_url = stream.start()
             manifest_path = stream.manifest_path
             try:
-                self.assertTrue(playback_url.startswith("udp://@127.0.0.1:"))
+                self.assertTrue(playback_url.startswith("udp://127.0.0.1:"))
+                self.assertNotIn("@", playback_url)
                 self.assertIn("-re", factory.args)
                 self.assertIn("-stream_loop", factory.args)
                 self.assertIn("file,http,https,tcp,tls,crypto", factory.args)
