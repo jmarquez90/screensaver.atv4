@@ -129,15 +129,15 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         played_items = [event[1] for event in events if event[0] == "play"]
         self.assertEqual(["first.mov", "second.mov", "first.mov"], played_items)
 
-    def test_direct_fallback_uses_fullscreen_when_overlay_is_requested(self):
+    def test_direct_fallback_prebuffers_windowed_when_overlay_is_requested(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
         subject.overlay_requested = True
 
         subject.start_direct_playback()
 
-        self.assertIn(("play", "first.mov", False), events)
+        self.assertIn(("play", "first.mov", True), events)
 
-    def test_continuous_transport_uses_fullscreen_playback(self):
+    def test_continuous_transport_prebuffers_windowed_for_overlay_handoff(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
         subject.overlay_requested = True
         continuous_stream = Mock()
@@ -145,7 +145,7 @@ class PlaybackHandoffContractTests(unittest.TestCase):
 
         subject.start_continuous_playback(continuous_stream)
 
-        self.assertIn(("play", "udp://@127.0.0.1:12345", False), events)
+        self.assertIn(("play", "udp://@127.0.0.1:12345", True), events)
 
     def test_continuous_transport_stays_windowed_without_an_overlay(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
@@ -277,6 +277,33 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         player.onAVStarted()
 
         show_overlay.assert_called_once_with()
+
+    def test_presentation_enters_fullscreen_before_opening_overlay(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject._show_overlays = Mock()
+        subject.transition_diagnostics = RecordingDiagnostics()
+        events = []
+
+        with patch.object(
+            atv.xbmc,
+            "getCondVisibility",
+            side_effect=[False, False, True],
+        ), patch.object(atv.xbmc, "executebuiltin") as execute_builtin:
+            original_monitor = atv.monitor
+            atv.monitor = RecordingMonitor(events)
+            try:
+                subject._present_playback()
+            finally:
+                atv.monitor = original_monitor
+
+        execute_builtin.assert_called_once_with("Action(FullScreen)")
+        self.assertEqual([("wait", 0.05)], events)
+        subject._show_overlays.assert_called_once_with()
+        self.assertEqual([
+            ("fullscreen-entry-requested", {}),
+            ("fullscreen-entered", {}),
+        ], subject.transition_diagnostics.events)
 
     def test_overlay_actions_close_the_entire_screensaver(self):
         overlay = object.__new__(atv.OverlayWindow)

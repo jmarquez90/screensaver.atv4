@@ -20,7 +20,7 @@
             <width>1280</width>
             <height>720</height>
             <texture>sanfrancisco.jpg</texture>
-            <visible>!String.IsEqual(Window.Property(screensaver-atv4-loading),"false")</visible>
+            <visible>String.IsEqual(Window.Property(screensaver-atv4-loading),"true")</visible>
         </control>
 		<control type="image" id ="32501">
 				<description>Busy animation</description>
@@ -31,7 +31,7 @@
 				<texture>busy.png</texture>
 				<aspectratio>keep</aspectratio>
 				<animation effect="rotate" start="0" end="360" center="55,700" time="1200" loop="true" condition="true">conditional</animation>
-				<visible>!String.IsEqual(Window.Property(screensaver-atv4-loading),"false")</visible>
+				<visible>String.IsEqual(Window.Property(screensaver-atv4-loading),"true")</visible>
 		</control>
 		<control type="label" id ="32502">
 				<top>655</top>
@@ -43,7 +43,7 @@
 				<aligny>center</aligny>
 				<align>left</align>
 				<label></label>
-				<visible>!String.IsEqual(Window.Property(screensaver-atv4-loading),"false")</visible>
+				<visible>String.IsEqual(Window.Property(screensaver-atv4-loading),"true")</visible>
 		</control>
 		<control type="label" id="32503">
 				<top>655</top>

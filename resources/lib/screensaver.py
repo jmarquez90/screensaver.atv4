@@ -1,5 +1,6 @@
 """
    Copyright (C) 2015- enen92
+   Copyright (C) 2026 Jeremiah Steven Marquez <jmarquez90@gmail.com>
    This file is part of screensaver.atv4 - https://github.com/enen92/screensaver.atv4
 
    SPDX-License-Identifier: GPL-2.0-only
@@ -26,7 +27,7 @@ class ScreensaverPreview(xbmcgui.WindowXMLDialog):
     def onInit(self):
         self.exit_monitor = self.ExitMonitor(self.exit)
         self.getControl(32502).setLabel(translate(32025))
-        self.setProperty("screensaver-atv4-loading", "1")
+        self.setProperty("screensaver-atv4-loading", "true")
         self.exit_monitor.waitForAbort(0.2)
         self.send_input()
 

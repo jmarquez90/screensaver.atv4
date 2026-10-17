@@ -181,14 +181,13 @@ class Screensaver(xbmcgui.WindowXML):
             self.transition_diagnostics.record("duplicate-init-ignored")
             return
 
-        self.getControl(32502).setLabel(translate(32008))
-        self.setProperty("screensaver-atv4-loading", "true")
+        self.setProperty("screensaver-atv4-loading", "false")
 
         if self.video_playlist:
             self.setProperty("screensaver-atv4-loading", "false")
             self.atv4player = TransitionPlayer(
                 self.transition_diagnostics,
-                self._show_overlays if self.overlay_requested else None,
+                self._present_playback if self.overlay_requested else None,
             )
 
             # Start player thread
@@ -271,6 +270,26 @@ class Screensaver(xbmcgui.WindowXML):
         self.overlay_window.exit_callback = self.clearAll
         self.overlay_window.show()
 
+    def _present_playback(self):
+        if not self.active:
+            return
+
+        fullscreen_condition = "Window.IsActive(fullscreenvideo)"
+        if not xbmc.getCondVisibility(fullscreen_condition):
+            self.transition_diagnostics.record("fullscreen-entry-requested")
+            xbmc.executebuiltin("Action(FullScreen)")
+
+        for _attempt in range(40):
+            if not self.active or monitor.abortRequested():
+                return
+            if xbmc.getCondVisibility(fullscreen_condition):
+                self.transition_diagnostics.record("fullscreen-entered")
+                self._show_overlays()
+                return
+            monitor.waitForAbort(0.05)
+
+        self.transition_diagnostics.record("fullscreen-entry-timeout")
+
     @classmethod
     def toTransparent(cls):
         trans = ScreensaverTrans(
@@ -337,7 +356,7 @@ class Screensaver(xbmcgui.WindowXML):
         self.atv4player.set_active_item("continuous-stream.ts")
         fullscreen_playback = self.overlay_requested
         fullscreen_seen = False
-        self.atv4player.play(stream_url, windowed=not fullscreen_playback)
+        self.atv4player.play(stream_url, windowed=True)
 
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)
@@ -354,7 +373,7 @@ class Screensaver(xbmcgui.WindowXML):
             elif not continuous_stream.is_running():
                 raise RuntimeError("continuous FFmpeg process exited")
 
-    def _request_direct_item(self, fullscreen_playback):
+    def _request_direct_item(self):
         active_item = self.video_playlist[self.playindex]
         active_asset_id = playback_asset_id(active_item)
         self.atv4player.set_active_item(active_item)
@@ -364,7 +383,7 @@ class Screensaver(xbmcgui.WindowXML):
             index=self.playindex,
             source=playback_source(active_item),
         )
-        self.atv4player.play(active_item, windowed=not fullscreen_playback)
+        self.atv4player.play(active_item, windowed=True)
         self.transition_diagnostics.record(
             "play-returned", asset_id=active_asset_id, index=self.playindex
         )
@@ -377,7 +396,7 @@ class Screensaver(xbmcgui.WindowXML):
         self.transition_diagnostics.record(
             "playback-loop-start", playlist_count=len(self.video_playlist)
         )
-        active_asset_id = self._request_direct_item(fullscreen_playback)
+        active_asset_id = self._request_direct_item()
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)
             if not self.active or monitor.abortRequested():
@@ -400,9 +419,7 @@ class Screensaver(xbmcgui.WindowXML):
                 self.playindex = (
                     self.playindex + 1
                 ) % len(self.video_playlist)
-                active_asset_id = self._request_direct_item(
-                    fullscreen_playback
-                )
+                active_asset_id = self._request_direct_item()
 
 
 def run(params=False):
