@@ -83,6 +83,9 @@ class ContinuousStreamTests(unittest.TestCase):
             try:
                 self.assertTrue(playback_url.startswith("udp://@127.0.0.1:"))
                 self.assertIn("-re", factory.args)
+                burst_index = factory.args.index("-readrate_initial_burst")
+                self.assertEqual("1", factory.args[burst_index + 1])
+                self.assertLess(burst_index, factory.args.index("-i"))
                 self.assertIn("-stream_loop", factory.args)
                 self.assertIn("file,http,https,tcp,tls,crypto", factory.args)
                 self.assertIn("+resend_headers", factory.args)

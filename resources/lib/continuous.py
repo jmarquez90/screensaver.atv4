@@ -69,6 +69,8 @@ class ContinuousStream:
             "-loglevel",
             "error",
             "-re",
+            "-readrate_initial_burst",
+            "1",
             "-stream_loop",
             "-1",
             "-protocol_whitelist",
