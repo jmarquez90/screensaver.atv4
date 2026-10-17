@@ -13,6 +13,7 @@ import tempfile
 
 
 FFMPEG_PATH = "/storage/.kodi/addons/tools.ffmpeg-tools/bin/ffmpeg"
+STARTUP_PRIMER_SECONDS = 0.25
 
 
 def _concat_quote(value):
@@ -22,6 +23,7 @@ def _concat_quote(value):
 
 def write_concat_manifest(items):
     """Write the already-randomized session order for FFmpeg's concat demuxer."""
+    items = list(items)
     manifest = tempfile.NamedTemporaryFile(
         mode="w",
         prefix="screensaver-atv4-",
@@ -32,6 +34,12 @@ def write_concat_manifest(items):
     )
     try:
         manifest.write("ffconcat version 1.0\n")
+        if items:
+            # Prime Kodi's hardware decoder with a disposable opening keyframe,
+            # then restart the first item normally before the visible playback.
+            manifest.write("file {}\n".format(_concat_quote(items[0])))
+            manifest.write("duration {:.2f}\n".format(STARTUP_PRIMER_SECONDS))
+            manifest.write("outpoint {:.2f}\n".format(STARTUP_PRIMER_SECONDS))
         for item in items:
             manifest.write("file {}\n".format(_concat_quote(item)))
         return manifest.name

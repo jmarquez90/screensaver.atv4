@@ -61,6 +61,9 @@ class ContinuousStreamTests(unittest.TestCase):
                 self.assertEqual([
                     "ffconcat version 1.0",
                     "file '/storage/aerials/b.mov'",
+                    "duration 0.25",
+                    "outpoint 0.25",
+                    "file '/storage/aerials/b.mov'",
                     "file 'http://example.test/a.mov'",
                 ], manifest.read().splitlines())
         finally:
