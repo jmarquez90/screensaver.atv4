@@ -162,22 +162,25 @@ class PlaybackHandoffContractTests(unittest.TestCase):
     def test_shutdown_closes_overlay_and_stops_playback_resources(self):
         subject = object.__new__(atv.Screensaver)
         subject.active = True
-        subject.overlay_window = Mock()
+        subject.overlay_path = "/tmp/aerial-overlay.ass"
         subject.atv4player = Mock()
         subject.continuous_stream = Mock()
         subject.close = Mock()
 
-        subject.clearAll()
+        with patch.object(atv, "remove_overlay_subtitle") as remove_overlay:
+            subject.clearAll()
 
         self.assertFalse(subject.active)
-        self.assertIsNone(subject.overlay_window)
+        self.assertIsNone(subject.overlay_path)
         subject.atv4player.stop.assert_called_once_with()
         subject.continuous_stream.stop.assert_called_once_with()
+        remove_overlay.assert_called_once_with("/tmp/aerial-overlay.ass")
         subject.close.assert_called_once_with()
 
     def test_player_callbacks_are_recorded_without_controlling_playback(self):
         diagnostics = RecordingDiagnostics()
         player = atv.TransitionPlayer(diagnostics)
+        player.setSubtitles = Mock()
         player.set_active_item("https://example.test/a.mov")
         asset_id = atv.playback_asset_id("https://example.test/a.mov")
 
@@ -192,6 +195,18 @@ class PlaybackHandoffContractTests(unittest.TestCase):
             ("playback-stopped", {"asset_id": asset_id}),
             ("playback-error", {"asset_id": asset_id}),
         ], diagnostics.events)
+        player.setSubtitles.assert_not_called()
+
+    def test_av_start_attaches_the_overlay_subtitle(self):
+        player = atv.TransitionPlayer(
+            RecordingDiagnostics(),
+            "/tmp/aerial-overlay.ass",
+        )
+        player.setSubtitles = Mock()
+
+        player.onAVStarted()
+
+        player.setSubtitles.assert_called_once_with("/tmp/aerial-overlay.ass")
 
     def test_source_classification_does_not_log_the_media_location(self):
         self.assertEqual("stream", atv.playback_source("https://example.test/a.mov"))
