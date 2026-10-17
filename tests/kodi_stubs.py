@@ -52,6 +52,19 @@ class DummyMonitor:
         return False
 
 
+class DummyListItem:
+    def __init__(self, path=""):
+        self.path = path
+        self.mime_type = None
+        self.content_lookup = True
+
+    def setMimeType(self, mime_type):
+        self.mime_type = mime_type
+
+    def setContentLookup(self, enabled):
+        self.content_lookup = enabled
+
+
 def install():
     """Install enough of Kodi's Python API for importing the add-on modules."""
     xbmc = types.ModuleType("xbmc")
@@ -70,6 +83,7 @@ def install():
     xbmcgui = types.ModuleType("xbmcgui")
     xbmcgui.Dialog = DummyDialog
     xbmcgui.DialogProgress = DummyDialog
+    xbmcgui.ListItem = DummyListItem
     xbmcgui.WindowXML = DummyWindow
     xbmcgui.WindowXMLDialog = DummyWindow
 

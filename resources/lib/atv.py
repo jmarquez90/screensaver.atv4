@@ -356,7 +356,14 @@ class Screensaver(xbmcgui.WindowXML):
         self.atv4player.set_active_item("continuous-stream.ts")
         fullscreen_playback = self.overlay_requested
         fullscreen_seen = False
-        self.atv4player.play(stream_url, windowed=not fullscreen_playback)
+        stream_item = xbmcgui.ListItem(path=stream_url)
+        stream_item.setMimeType("video/mp2t")
+        stream_item.setContentLookup(False)
+        self.atv4player.play(
+            stream_url,
+            listitem=stream_item,
+            windowed=not fullscreen_playback,
+        )
 
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)

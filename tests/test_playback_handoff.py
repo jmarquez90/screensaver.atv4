@@ -43,12 +43,14 @@ class StoppedPlayer:
         self.stop_after_plays = stop_after_plays
         self.play_count = 0
         self.active_item = None
+        self.listitem = None
 
     def set_active_item(self, item):
         self.active_item = item
 
-    def play(self, item, windowed=False):
+    def play(self, item, listitem=None, windowed=False):
         self.play_count += 1
+        self.listitem = listitem
         self.events.append(("play", item, windowed))
         if self.play_count >= self.stop_after_plays:
             self.owner.active = False
@@ -141,21 +143,24 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
         subject.overlay_requested = True
         continuous_stream = Mock()
-        continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
+        continuous_stream.start.return_value = "udp://127.0.0.1:12345"
 
         subject.start_continuous_playback(continuous_stream)
 
-        self.assertIn(("play", "udp://@127.0.0.1:12345", False), events)
+        self.assertIn(("play", "udp://127.0.0.1:12345", False), events)
+        self.assertEqual("udp://127.0.0.1:12345", subject.atv4player.listitem.path)
+        self.assertEqual("video/mp2t", subject.atv4player.listitem.mime_type)
+        self.assertFalse(subject.atv4player.listitem.content_lookup)
 
     def test_continuous_transport_stays_windowed_without_an_overlay(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
         subject.overlay_requested = False
         continuous_stream = Mock()
-        continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
+        continuous_stream.start.return_value = "udp://127.0.0.1:12345"
 
         subject.start_continuous_playback(continuous_stream)
 
-        self.assertIn(("play", "udp://@127.0.0.1:12345", True), events)
+        self.assertIn(("play", "udp://127.0.0.1:12345", True), events)
 
     def test_ignores_duplicate_init_after_fullscreen_video_exits(self):
         subject = object.__new__(atv.Screensaver)
