@@ -414,7 +414,10 @@ def run(params=False):
             'default',
             '',
         )
-        screensaver.doModal()
+        try:
+            screensaver.doModal()
+        finally:
+            addon.setSettingBool("is_locked", False)
         xbmc.sleep(100)
         del screensaver
 

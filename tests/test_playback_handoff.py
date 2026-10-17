@@ -286,6 +286,37 @@ class PlaybackHandoffContractTests(unittest.TestCase):
 
         overlay.exit_callback.assert_called_once_with()
 
+    def test_any_main_window_action_unlocks_and_closes_screensaver(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.clearAll = Mock()
+        atv.addon.setSettingBool("is_locked", True)
+
+        subject.onAction(Mock())
+
+        self.assertFalse(atv.addon.getSettingBool("is_locked"))
+        subject.clearAll.assert_called_once_with()
+
+    def test_screensaver_run_releases_lock_after_window_closes(self):
+        window = Mock()
+        atv.addon.setSettingBool("is_locked", False)
+
+        with patch.object(atv, "Screensaver", return_value=window):
+            atv.run()
+
+        window.doModal.assert_called_once_with()
+        self.assertFalse(atv.addon.getSettingBool("is_locked"))
+
+    def test_screensaver_run_releases_lock_after_window_error(self):
+        window = Mock()
+        window.doModal.side_effect = RuntimeError("window failed")
+        atv.addon.setSettingBool("is_locked", False)
+
+        with patch.object(atv, "Screensaver", return_value=window):
+            with self.assertRaises(RuntimeError):
+                atv.run()
+
+        self.assertFalse(atv.addon.getSettingBool("is_locked"))
+
     def test_source_classification_does_not_log_the_media_location(self):
         self.assertEqual("stream", atv.playback_source("https://example.test/a.mov"))
         self.assertEqual("stream", atv.playback_source("http://example.test/a.mov"))
