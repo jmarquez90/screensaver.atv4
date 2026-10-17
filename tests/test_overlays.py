@@ -8,16 +8,35 @@
 
 import unittest
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from xml.etree import ElementTree
 
 from resources.lib.overlays import (
-    ass_document,
-    create_overlay_subtitle,
-    overlay_lines,
+    DATE_CONTROL_ID,
+    TIME_CONTROL_ID,
+    WEATHER_CONTROL_ID,
+    configure_overlays,
     overlays_enabled,
-    remove_overlay_subtitle,
 )
+
+
+class FakeControl:
+    def __init__(self):
+        self.visible = None
+
+    def setVisible(self, visible):
+        self.visible = visible
+
+
+class FakeWindow:
+    def __init__(self):
+        self.controls = {
+            TIME_CONTROL_ID: FakeControl(),
+            DATE_CONTROL_ID: FakeControl(),
+            WEATHER_CONTROL_ID: FakeControl(),
+        }
+
+    def getControl(self, control_id):
+        return self.controls[control_id]
 
 
 class FakeSettings:
@@ -28,75 +47,40 @@ class FakeSettings:
         return self.values.get(setting_id, False)
 
 
-INFO_LABELS = {
-    "System.Time": "9:42 PM",
-    "System.Date": "Thursday, October 16, 2026",
-    "Weather.Temperature": "68°F",
-    "Weather.Conditions": "Mainly Sunny",
-}
-
-
 class NativeOverlayTests(unittest.TestCase):
-    def test_overlays_capture_only_enabled_kodi_labels(self):
-        lines = overlay_lines(
+    def test_overlays_are_opt_in_and_independent(self):
+        window = FakeWindow()
+        visibility = configure_overlays(
+            window,
             FakeSettings(**{
                 "show-time-overlay": True,
                 "show-date-overlay": False,
                 "show-weather-overlay": True,
             }),
-            INFO_LABELS.__getitem__,
         )
 
-        self.assertEqual([
-            ("weather", "68°F  ·  Mainly Sunny"),
-            ("time", "9:42 PM"),
-        ], lines)
+        self.assertEqual({
+            TIME_CONTROL_ID: True,
+            DATE_CONTROL_ID: False,
+            WEATHER_CONTROL_ID: True,
+        }, visibility)
+        self.assertTrue(window.controls[TIME_CONTROL_ID].visible)
+        self.assertFalse(window.controls[DATE_CONTROL_ID].visible)
+        self.assertTrue(window.controls[WEATHER_CONTROL_ID].visible)
 
-    def test_missing_settings_create_no_overlay(self):
+    def test_missing_settings_keep_overlays_hidden(self):
+        window = FakeWindow()
+        configure_overlays(window, FakeSettings())
+
+        self.assertFalse(window.controls[TIME_CONTROL_ID].visible)
+        self.assertFalse(window.controls[DATE_CONTROL_ID].visible)
+        self.assertFalse(window.controls[WEATHER_CONTROL_ID].visible)
+
+    def test_overlay_window_is_only_needed_when_a_setting_is_enabled(self):
         self.assertFalse(overlays_enabled(FakeSettings()))
-        self.assertEqual([], overlay_lines(FakeSettings(), INFO_LABELS.__getitem__))
-
-    def test_overlay_is_enabled_when_any_setting_is_enabled(self):
         self.assertTrue(overlays_enabled(FakeSettings(**{
             "show-date-overlay": True,
         })))
-
-    def test_ass_document_is_bottom_right_and_long_lived(self):
-        document = ass_document([
-            ("weather", "68°F"),
-            ("time", "9:42 PM"),
-            ("date", "October 16"),
-        ])
-
-        self.assertIn("Style: Aerial,Arial,34", document)
-        self.assertIn(",3,80,80,80,1", document)
-        self.assertIn("9:59:59.99", document)
-        self.assertIn(
-            r"{\fs34}68°F\N{\fs52}9:42 PM\N{\fs34}October 16",
-            document,
-        )
-
-    def test_subtitle_file_is_written_and_removed(self):
-        with TemporaryDirectory() as directory:
-            path = create_overlay_subtitle(
-                FakeSettings(**{
-                    "show-time-overlay": True,
-                    "show-date-overlay": True,
-                    "show-weather-overlay": True,
-                }),
-                INFO_LABELS.__getitem__,
-                directory=directory,
-            )
-            subtitle = Path(path)
-
-            self.assertGreater(subtitle.stat().st_size, 0)
-            content = subtitle.read_text(encoding="utf-8")
-            self.assertIn("Mainly Sunny", content)
-            self.assertIn("9:42 PM", content)
-            self.assertIn("Thursday, October 16, 2026", content)
-
-            remove_overlay_subtitle(path)
-            self.assertFalse(subtitle.exists())
 
     def test_public_settings_are_opt_in(self):
         root = Path(__file__).resolve().parents[1]
@@ -116,6 +100,44 @@ class NativeOverlayTests(unittest.TestCase):
             "show-date-overlay": "false",
             "show-weather-overlay": "false",
         }, defaults)
+
+    def test_both_layouts_use_live_kodi_labels(self):
+        root = Path(__file__).resolve().parents[1]
+        for resolution in ("720p", "1080i"):
+            layout = ElementTree.parse(
+                root / "resources" / "skins" / "default" / resolution
+                / "screensaver-atv4-overlays.xml"
+            )
+            labels = {
+                int(control.attrib["id"]): control.findtext("label")
+                for control in layout.findall(".//control")
+                if control.attrib.get("id") in {
+                    str(TIME_CONTROL_ID),
+                    str(DATE_CONTROL_ID),
+                    str(WEATHER_CONTROL_ID),
+                }
+            }
+
+            self.assertEqual({
+                TIME_CONTROL_ID: "$INFO[System.Time]",
+                DATE_CONTROL_ID: "$INFO[System.Date]",
+                WEATHER_CONTROL_ID: (
+                    "$INFO[Weather.Temperature]"
+                    "$INFO[Weather.Conditions,  ·  ]"
+                ),
+            }, labels)
+
+    def test_overlay_dialogs_are_transparent_and_modeless(self):
+        root = Path(__file__).resolve().parents[1]
+        for resolution in ("720p", "1080i"):
+            layout = ElementTree.parse(
+                root / "resources" / "skins" / "default" / resolution
+                / "screensaver-atv4-overlays.xml"
+            )
+
+            self.assertEqual("0", layout.getroot().findtext("backgroundcolor"))
+            self.assertEqual("dialog", layout.getroot().attrib["type"])
+            self.assertEqual("modeless", layout.getroot().attrib["modality"])
 
     def test_main_video_layouts_remain_free_of_overlay_labels(self):
         root = Path(__file__).resolve().parents[1]

@@ -19,7 +19,7 @@ import xbmcgui
 from .commonatv import translate, addon, addon_path
 from .continuous import ContinuousStream
 from .offline import offline
-from .overlays import create_overlay_subtitle, remove_overlay_subtitle
+from .overlays import configure_overlays, overlays_enabled
 from .playlist import AtvPlaylist
 from .trans import ScreensaverTrans
 
@@ -58,10 +58,10 @@ class TransitionPlayer(xbmc.Player):
 
     progress_sample_limit = 10
 
-    def __init__(self, diagnostics, overlay_path=None):
+    def __init__(self, diagnostics, av_started_callback=None):
         super().__init__()
         self._diagnostics = diagnostics
-        self._overlay_path = overlay_path
+        self._av_started_callback = av_started_callback
         self._state_lock = threading.Lock()
         self._active_asset_id = "unknown"
         self._progress_sample_index = 0
@@ -83,9 +83,8 @@ class TransitionPlayer(xbmc.Player):
 
     def onAVStarted(self):
         self._record_callback("av-started", start_progress_sampling=True)
-        if self._overlay_path:
-            self.setSubtitles(self._overlay_path)
-            self.showSubtitles(True)
+        if self._av_started_callback:
+            self._av_started_callback()
 
     def onPlayBackEnded(self):
         self._record_callback("playback-ended")
@@ -130,6 +129,16 @@ class TransitionPlayer(xbmc.Player):
         )
 
 
+class OverlayWindow(xbmcgui.WindowXMLDialog):
+    """Keep Kodi-owned live labels above fullscreen video."""
+
+    def onInit(self):
+        configure_overlays(self, addon)
+
+    def onAction(self, _action):
+        self.exit_callback()
+
+
 def playback_source(item):
     value = str(item).lower()
     if value.startswith(("http://", "https://")):
@@ -160,7 +169,8 @@ class Screensaver(xbmcgui.WindowXML):
         self.active = True
         self.atv4player = None
         self.continuous_stream = None
-        self.overlay_path = None
+        self.overlay_window = None
+        self.overlay_requested = overlays_enabled(addon)
         self.transition_diagnostics = TransitionDiagnostics()
         self.video_playlist = AtvPlaylist().compute_playlist_array()
         xbmc.log(msg=f"kodi dpms time: {self.DPMStime}", level=xbmc.LOGDEBUG)
@@ -176,10 +186,9 @@ class Screensaver(xbmcgui.WindowXML):
 
         if self.video_playlist:
             self.setProperty("screensaver-atv4-loading", "false")
-            self.overlay_path = create_overlay_subtitle(addon, xbmc.getInfoLabel)
             self.atv4player = TransitionPlayer(
                 self.transition_diagnostics,
-                self.overlay_path,
+                self._show_overlays if self.overlay_requested else None,
             )
 
             # Start player thread
@@ -250,6 +259,18 @@ class Screensaver(xbmcgui.WindowXML):
         self.getControl(32503).setLabel(translate(32048))
         self.getControl(32503).setVisible(True)
 
+    def _show_overlays(self):
+        if not self.active or self.overlay_window:
+            return
+        self.overlay_window = OverlayWindow(
+            'screensaver-atv4-overlays.xml',
+            addon_path,
+            'default',
+            '',
+        )
+        self.overlay_window.exit_callback = self.clearAll
+        self.overlay_window.show()
+
     @classmethod
     def toTransparent(cls):
         trans = ScreensaverTrans(
@@ -264,13 +285,23 @@ class Screensaver(xbmcgui.WindowXML):
 
     def clearAll(self, close=True):
         self.active = False
+        if self.overlay_window:
+            self.overlay_window.close()
+            self.overlay_window = None
         if self.atv4player:
             self.atv4player.stop()
         if self.continuous_stream:
             self.continuous_stream.stop()
-        remove_overlay_subtitle(self.overlay_path)
-        self.overlay_path = None
         self.close()
+
+    def _observe_fullscreen_exit(self, fullscreen_seen):
+        if xbmc.getCondVisibility("Window.IsActive(fullscreenvideo)"):
+            return True, False
+        if not fullscreen_seen:
+            return False, False
+        self.transition_diagnostics.record("fullscreen-exited")
+        self.clearAll()
+        return True, True
 
     def onAction(self, action):
         addon.setSettingBool("is_locked", False)
@@ -304,7 +335,7 @@ class Screensaver(xbmcgui.WindowXML):
             "continuous-stream-started", playlist_count=len(self.video_playlist)
         )
         self.atv4player.set_active_item("continuous-stream.ts")
-        fullscreen_playback = bool(self.overlay_path)
+        fullscreen_playback = self.overlay_requested
         fullscreen_seen = False
         self.atv4player.play(stream_url, windowed=not fullscreen_playback)
 
@@ -313,27 +344,19 @@ class Screensaver(xbmcgui.WindowXML):
             if not self.active or monitor.abortRequested():
                 break
             if fullscreen_playback:
-                fullscreen_active = xbmc.getCondVisibility(
-                    "Window.IsActive(fullscreenvideo)"
+                fullscreen_seen, fullscreen_exited = (
+                    self._observe_fullscreen_exit(fullscreen_seen)
                 )
-                if fullscreen_active:
-                    fullscreen_seen = True
-                elif fullscreen_seen:
-                    self.transition_diagnostics.record("fullscreen-exited")
-                    self.clearAll()
+                if fullscreen_exited:
                     break
             if self.atv4player.isPlaying():
                 self.atv4player.record_progress_sample()
             elif not continuous_stream.is_running():
                 raise RuntimeError("continuous FFmpeg process exited")
 
-    def start_direct_playback(self):
-        self.playindex = 0
+    def _request_direct_item(self, fullscreen_playback):
         active_item = self.video_playlist[self.playindex]
         active_asset_id = playback_asset_id(active_item)
-        self.transition_diagnostics.record(
-            "playback-loop-start", playlist_count=len(self.video_playlist)
-        )
         self.atv4player.set_active_item(active_item)
         self.transition_diagnostics.record(
             "play-requested",
@@ -341,12 +364,30 @@ class Screensaver(xbmcgui.WindowXML):
             index=self.playindex,
             source=playback_source(active_item),
         )
-        self.atv4player.play(active_item, windowed=True)
+        self.atv4player.play(active_item, windowed=not fullscreen_playback)
         self.transition_diagnostics.record(
             "play-returned", asset_id=active_asset_id, index=self.playindex
         )
+        return active_asset_id
+
+    def start_direct_playback(self):
+        self.playindex = 0
+        fullscreen_playback = self.overlay_requested
+        fullscreen_seen = False
+        self.transition_diagnostics.record(
+            "playback-loop-start", playlist_count=len(self.video_playlist)
+        )
+        active_asset_id = self._request_direct_item(fullscreen_playback)
         while self.active and not monitor.abortRequested():
             monitor.waitForAbort(1)
+            if not self.active or monitor.abortRequested():
+                break
+            if fullscreen_playback:
+                fullscreen_seen, fullscreen_exited = (
+                    self._observe_fullscreen_exit(fullscreen_seen)
+                )
+                if fullscreen_exited:
+                    break
             # If we finish playing the video
             if self.atv4player.isPlaying():
                 self.atv4player.record_progress_sample()
@@ -356,24 +397,11 @@ class Screensaver(xbmcgui.WindowXML):
                     asset_id=active_asset_id,
                     index=self.playindex,
                 )
-                # Increment the iterator used to access the array or reset to 0
-                if self.playindex < len(self.video_playlist) - 1:
-                    self.playindex += 1
-                else:
-                    self.playindex = 0
-                # Using the updated iterator, start playing the next video
-                active_item = self.video_playlist[self.playindex]
-                active_asset_id = playback_asset_id(active_item)
-                self.atv4player.set_active_item(active_item)
-                self.transition_diagnostics.record(
-                    "play-requested",
-                    asset_id=active_asset_id,
-                    index=self.playindex,
-                    source=playback_source(active_item),
-                )
-                self.atv4player.play(active_item, windowed=True)
-                self.transition_diagnostics.record(
-                    "play-returned", asset_id=active_asset_id, index=self.playindex
+                self.playindex = (
+                    self.playindex + 1
+                ) % len(self.video_playlist)
+                active_asset_id = self._request_direct_item(
+                    fullscreen_playback
                 )
 
 

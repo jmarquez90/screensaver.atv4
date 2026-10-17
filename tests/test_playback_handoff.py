@@ -67,6 +67,7 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         subject = object.__new__(atv.Screensaver)
         subject.active = True
         subject.video_playlist = playlist_items
+        subject.overlay_requested = False
         subject.atv4player = StoppedPlayer(subject, events, stop_after_plays)
         subject.transition_diagnostics = RecordingDiagnostics()
         return subject, events, subject.transition_diagnostics.events
@@ -128,9 +129,17 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         played_items = [event[1] for event in events if event[0] == "play"]
         self.assertEqual(["first.mov", "second.mov", "first.mov"], played_items)
 
+    def test_direct_fallback_uses_fullscreen_when_overlay_is_requested(self):
+        subject, events, _ = self.make_screensaver(["first.mov"], 1)
+        subject.overlay_requested = True
+
+        subject.start_direct_playback()
+
+        self.assertIn(("play", "first.mov", False), events)
+
     def test_continuous_transport_uses_fullscreen_playback(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
-        subject.overlay_path = "/tmp/aerial-overlay.ass"
+        subject.overlay_requested = True
         continuous_stream = Mock()
         continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
 
@@ -140,7 +149,7 @@ class PlaybackHandoffContractTests(unittest.TestCase):
 
     def test_continuous_transport_stays_windowed_without_an_overlay(self):
         subject, events, _ = self.make_screensaver(["first.mov"], 1)
-        subject.overlay_path = None
+        subject.overlay_requested = False
         continuous_stream = Mock()
         continuous_stream.start.return_value = "udp://@127.0.0.1:12345"
 
@@ -163,7 +172,7 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         subject = object.__new__(atv.Screensaver)
         subject.active = True
         subject.video_playlist = ["first.mov"]
-        subject.overlay_path = "/tmp/aerial-overlay.ass"
+        subject.overlay_requested = True
         subject.atv4player = Mock()
         subject.atv4player.isPlaying.return_value = True
         subject.transition_diagnostics = RecordingDiagnostics()
@@ -225,25 +234,24 @@ class PlaybackHandoffContractTests(unittest.TestCase):
     def test_shutdown_closes_overlay_and_stops_playback_resources(self):
         subject = object.__new__(atv.Screensaver)
         subject.active = True
-        subject.overlay_path = "/tmp/aerial-overlay.ass"
+        subject.overlay_window = Mock()
         subject.atv4player = Mock()
         subject.continuous_stream = Mock()
         subject.close = Mock()
 
-        with patch.object(atv, "remove_overlay_subtitle") as remove_overlay:
-            subject.clearAll()
+        overlay_window = subject.overlay_window
+        subject.clearAll()
 
         self.assertFalse(subject.active)
-        self.assertIsNone(subject.overlay_path)
+        self.assertIsNone(subject.overlay_window)
+        overlay_window.close.assert_called_once_with()
         subject.atv4player.stop.assert_called_once_with()
         subject.continuous_stream.stop.assert_called_once_with()
-        remove_overlay.assert_called_once_with("/tmp/aerial-overlay.ass")
         subject.close.assert_called_once_with()
 
     def test_player_callbacks_are_recorded_without_controlling_playback(self):
         diagnostics = RecordingDiagnostics()
         player = atv.TransitionPlayer(diagnostics)
-        player.setSubtitles = Mock()
         player.set_active_item("https://example.test/a.mov")
         asset_id = atv.playback_asset_id("https://example.test/a.mov")
 
@@ -258,20 +266,25 @@ class PlaybackHandoffContractTests(unittest.TestCase):
             ("playback-stopped", {"asset_id": asset_id}),
             ("playback-error", {"asset_id": asset_id}),
         ], diagnostics.events)
-        player.setSubtitles.assert_not_called()
 
-    def test_av_start_attaches_the_overlay_subtitle(self):
+    def test_av_start_opens_the_live_overlay(self):
+        show_overlay = Mock()
         player = atv.TransitionPlayer(
             RecordingDiagnostics(),
-            "/tmp/aerial-overlay.ass",
+            show_overlay,
         )
-        player.setSubtitles = Mock()
-        player.showSubtitles = Mock()
 
         player.onAVStarted()
 
-        player.setSubtitles.assert_called_once_with("/tmp/aerial-overlay.ass")
-        player.showSubtitles.assert_called_once_with(True)
+        show_overlay.assert_called_once_with()
+
+    def test_overlay_actions_close_the_entire_screensaver(self):
+        overlay = object.__new__(atv.OverlayWindow)
+        overlay.exit_callback = Mock()
+
+        overlay.onAction(Mock())
+
+        overlay.exit_callback.assert_called_once_with()
 
     def test_source_classification_does_not_log_the_media_location(self):
         self.assertEqual("stream", atv.playback_source("https://example.test/a.mov"))
