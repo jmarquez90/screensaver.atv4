@@ -45,8 +45,9 @@ class StoppedPlayer:
         self.active_item = None
         self.listitem = None
 
-    def set_active_item(self, item):
+    def set_active_item(self, item, playback_target=None):
         self.active_item = item
+        self.playback_target = playback_target or item
 
     def play(self, item, listitem=None, windowed=False):
         self.play_count += 1
@@ -254,6 +255,24 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         subject.continuous_stream.stop.assert_called_once_with()
         subject.close.assert_called_once_with()
 
+    def test_external_playback_cleanup_does_not_stop_the_new_movie(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject.overlay_window = Mock()
+        subject.atv4player = Mock()
+        subject.continuous_stream = Mock()
+        subject.close = Mock()
+
+        overlay_window = subject.overlay_window
+        subject.clearAll(stop_player=False)
+
+        self.assertFalse(subject.active)
+        self.assertIsNone(subject.overlay_window)
+        overlay_window.close.assert_called_once_with()
+        subject.atv4player.stop.assert_not_called()
+        subject.continuous_stream.stop.assert_called_once_with()
+        subject.close.assert_called_once_with()
+
     def test_player_callbacks_are_recorded_without_controlling_playback(self):
         diagnostics = RecordingDiagnostics()
         player = atv.TransitionPlayer(diagnostics)
@@ -282,6 +301,58 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         player.onAVStarted()
 
         show_overlay.assert_called_once_with()
+
+    def test_player_recognizes_its_current_playback_target(self):
+        player = atv.TransitionPlayer(RecordingDiagnostics())
+        player.set_active_item(
+            "continuous-stream.ts",
+            playback_target="udp://127.0.0.1:12345",
+        )
+        player.getPlayingFile = lambda: "udp://127.0.0.1:12345"
+
+        self.assertTrue(player.owns_current_playback())
+
+    def test_player_rejects_an_external_playback_target(self):
+        player = atv.TransitionPlayer(RecordingDiagnostics())
+        player.set_active_item(
+            "continuous-stream.ts",
+            playback_target="udp://127.0.0.1:12345",
+        )
+        player.getPlayingFile = lambda: "plugin://example/movie/42"
+
+        self.assertFalse(player.owns_current_playback())
+
+    def test_owned_av_start_presents_the_overlay(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject.overlay_requested = True
+        subject.atv4player = Mock()
+        subject.atv4player.owns_current_playback.return_value = True
+        subject._present_playback = Mock()
+        subject.clearAll = Mock()
+
+        subject._handle_av_started()
+
+        subject._present_playback.assert_called_once_with()
+        subject.clearAll.assert_not_called()
+
+    def test_external_av_start_releases_screensaver_without_stopping_movie(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject.overlay_requested = True
+        subject.atv4player = Mock()
+        subject.atv4player.owns_current_playback.return_value = False
+        subject.transition_diagnostics = RecordingDiagnostics()
+        subject._present_playback = Mock()
+        subject.clearAll = Mock()
+
+        subject._handle_av_started()
+
+        subject._present_playback.assert_not_called()
+        subject.clearAll.assert_called_once_with(stop_player=False)
+        self.assertEqual([
+            ("external-playback-detected", {}),
+        ], subject.transition_diagnostics.events)
 
     def test_presentation_enters_fullscreen_before_opening_overlay(self):
         subject = object.__new__(atv.Screensaver)

@@ -64,14 +64,32 @@ class TransitionPlayer(xbmc.Player):
         self._av_started_callback = av_started_callback
         self._state_lock = threading.Lock()
         self._active_asset_id = "unknown"
+        self._active_playback_target = None
         self._progress_sample_index = 0
         self._progress_samples_remaining = 0
 
-    def set_active_item(self, item):
+    def set_active_item(self, item, playback_target=None):
         with self._state_lock:
             self._active_asset_id = playback_asset_id(item)
+            self._active_playback_target = str(playback_target or item)
             self._progress_sample_index = 0
             self._progress_samples_remaining = 0
+
+    def owns_current_playback(self):
+        with self._state_lock:
+            expected_target = self._active_playback_target
+
+        if not expected_target:
+            return False
+
+        try:
+            current_target = self.getPlayingFile()
+        except Exception:
+            return False
+
+        return playback_target_id(current_target) == playback_target_id(
+            expected_target
+        )
 
     def _record_callback(self, event, start_progress_sampling=False):
         with self._state_lock:
@@ -159,6 +177,22 @@ def playback_asset_id(item):
     return sha256(identity.encode("utf-8")).hexdigest()[:16]
 
 
+def playback_target_id(item):
+    """Return an opaque identity for playback ownership comparisons."""
+    value = str(item)
+    parsed = urlsplit(value)
+    if parsed.scheme:
+        normalized = "|".join((
+            parsed.scheme.lower(),
+            (parsed.hostname or "").lower(),
+            str(parsed.port or ""),
+            unquote(parsed.path).replace("\\", "/"),
+        ))
+    else:
+        normalized = unquote(value).replace("\\", "/")
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+
 class Screensaver(xbmcgui.WindowXML):
 
     def __init__(self, *args, **kwargs):
@@ -187,7 +221,7 @@ class Screensaver(xbmcgui.WindowXML):
             self.setProperty("screensaver-atv4-loading", "false")
             self.atv4player = TransitionPlayer(
                 self.transition_diagnostics,
-                self._present_playback if self.overlay_requested else None,
+                self._handle_av_started,
             )
 
             # Start player thread
@@ -270,6 +304,16 @@ class Screensaver(xbmcgui.WindowXML):
         self.overlay_window.exit_callback = self.clearAll
         self.overlay_window.show()
 
+    def _handle_av_started(self):
+        if not self.active:
+            return
+        if not self.atv4player.owns_current_playback():
+            self.transition_diagnostics.record("external-playback-detected")
+            self.clearAll(stop_player=False)
+            return
+        if self.overlay_requested:
+            self._present_playback()
+
     def _present_playback(self):
         if not self.active:
             return
@@ -302,12 +346,12 @@ class Screensaver(xbmcgui.WindowXML):
         xbmc.sleep(100)
         del trans
 
-    def clearAll(self, close=True):
+    def clearAll(self, close=True, stop_player=True):
         self.active = False
         if self.overlay_window:
             self.overlay_window.close()
             self.overlay_window = None
-        if self.atv4player:
+        if stop_player and self.atv4player:
             self.atv4player.stop()
         if self.continuous_stream:
             self.continuous_stream.stop()
@@ -353,7 +397,10 @@ class Screensaver(xbmcgui.WindowXML):
         self.transition_diagnostics.record(
             "continuous-stream-started", playlist_count=len(self.video_playlist)
         )
-        self.atv4player.set_active_item("continuous-stream.ts")
+        self.atv4player.set_active_item(
+            "continuous-stream.ts",
+            playback_target=stream_url,
+        )
         fullscreen_playback = self.overlay_requested
         fullscreen_seen = False
         stream_item = xbmcgui.ListItem(path=stream_url)
