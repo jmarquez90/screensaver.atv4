@@ -342,14 +342,41 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         subject.overlay_requested = True
         subject.atv4player = Mock()
         subject.atv4player.owns_current_playback.return_value = False
+        subject.atv4player.isPlayingVideo.return_value = True
         subject.transition_diagnostics = RecordingDiagnostics()
         subject._present_playback = Mock()
         subject.clearAll = Mock()
 
-        subject._handle_av_started()
+        with patch.object(atv.xbmc, "executebuiltin") as execute_builtin:
+            subject._handle_av_started()
 
         subject._present_playback.assert_not_called()
         subject.clearAll.assert_called_once_with(stop_player=False)
+        execute_builtin.assert_called_once_with(
+            "ActivateWindow(fullscreenvideo)"
+        )
+        self.assertEqual([
+            ("external-playback-detected", {}),
+            ("external-video-presented", {}),
+        ], subject.transition_diagnostics.events)
+
+    def test_external_audio_does_not_activate_fullscreen_video(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject.overlay_requested = True
+        subject.atv4player = Mock()
+        subject.atv4player.owns_current_playback.return_value = False
+        subject.atv4player.isPlayingVideo.return_value = False
+        subject.transition_diagnostics = RecordingDiagnostics()
+        subject._present_playback = Mock()
+        subject.clearAll = Mock()
+
+        with patch.object(atv.xbmc, "executebuiltin") as execute_builtin:
+            subject._handle_av_started()
+
+        subject._present_playback.assert_not_called()
+        subject.clearAll.assert_called_once_with(stop_player=False)
+        execute_builtin.assert_not_called()
         self.assertEqual([
             ("external-playback-detected", {}),
         ], subject.transition_diagnostics.events)

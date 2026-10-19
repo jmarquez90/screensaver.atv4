@@ -309,7 +309,13 @@ class Screensaver(xbmcgui.WindowXML):
             return
         if not self.atv4player.owns_current_playback():
             self.transition_diagnostics.record("external-playback-detected")
+            external_video = self.atv4player.isPlayingVideo()
             self.clearAll(stop_player=False)
+            if external_video:
+                xbmc.executebuiltin("ActivateWindow(fullscreenvideo)")
+                self.transition_diagnostics.record(
+                    "external-video-presented"
+                )
             return
         if self.overlay_requested:
             self._present_playback()
