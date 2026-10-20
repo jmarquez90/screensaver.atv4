@@ -157,6 +157,16 @@ class OverlayWindow(xbmcgui.WindowXMLDialog):
         self.exit_callback()
 
 
+class ScreensaverExitMonitor(xbmc.Monitor):
+    """Relay Kodi's native screensaver deactivation to Aerial."""
+
+    def __init__(self, exit_callback):
+        self.exit_callback = exit_callback
+
+    def onScreensaverDeactivated(self):
+        self.exit_callback()
+
+
 def playback_source(item):
     value = str(item).lower()
     if value.startswith(("http://", "https://")):
@@ -206,6 +216,9 @@ class Screensaver(xbmcgui.WindowXML):
         self.overlay_window = None
         self.overlay_requested = overlays_enabled(addon)
         self.transition_diagnostics = TransitionDiagnostics()
+        self.exit_monitor = ScreensaverExitMonitor(
+            self._handle_screensaver_deactivated
+        )
         self.video_playlist = AtvPlaylist().compute_playlist_array()
         xbmc.log(msg=f"kodi dpms time: {self.DPMStime}", level=xbmc.LOGDEBUG)
         xbmc.log(msg=f"kodi dpms active: {self.isDPMSactive}", level=xbmc.LOGDEBUG)
@@ -362,6 +375,12 @@ class Screensaver(xbmcgui.WindowXML):
         if self.continuous_stream:
             self.continuous_stream.stop()
         self.close()
+
+    def _handle_screensaver_deactivated(self):
+        if not self.active:
+            return
+        self.transition_diagnostics.record("screensaver-deactivated")
+        self.clearAll()
 
     def _observe_fullscreen_exit(self, fullscreen_seen):
         if xbmc.getCondVisibility("Window.IsActive(fullscreenvideo)"):

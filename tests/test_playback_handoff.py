@@ -445,6 +445,30 @@ class PlaybackHandoffContractTests(unittest.TestCase):
         self.assertFalse(atv.addon.getSettingBool("is_locked"))
         subject.clearAll.assert_called_once_with()
 
+    def test_native_screensaver_deactivation_closes_aerial(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = True
+        subject.transition_diagnostics = RecordingDiagnostics()
+        subject.clearAll = Mock()
+
+        subject._handle_screensaver_deactivated()
+
+        subject.clearAll.assert_called_once_with()
+        self.assertEqual([
+            ("screensaver-deactivated", {}),
+        ], subject.transition_diagnostics.events)
+
+    def test_late_native_deactivation_is_ignored_after_cleanup(self):
+        subject = object.__new__(atv.Screensaver)
+        subject.active = False
+        subject.transition_diagnostics = RecordingDiagnostics()
+        subject.clearAll = Mock()
+
+        subject._handle_screensaver_deactivated()
+
+        subject.clearAll.assert_not_called()
+        self.assertEqual([], subject.transition_diagnostics.events)
+
     def test_screensaver_run_releases_lock_after_window_closes(self):
         window = Mock()
         atv.addon.setSettingBool("is_locked", False)
