@@ -28,7 +28,8 @@ class ScreensaverPreview(xbmcgui.WindowXMLDialog):
         self.exit_monitor = self.ExitMonitor(self.exit)
         self.getControl(32502).setLabel(translate(32025))
         self.setProperty("screensaver-atv4-loading", "true")
-        self.runAddon()
+        self.exit_monitor.waitForAbort(0.2)
+        self.send_input()
 
     @staticmethod
     def send_input():
@@ -41,27 +42,8 @@ class ScreensaverPreview(xbmcgui.WindowXMLDialog):
     def exit(self):
         self.clearProperty("screensaver-atv4-loading")
         self.close()
-
-
-class NativeScreensaverSession:
-    """Keep Kodi's screensaver lifecycle active while Aerial is running."""
-
-    class ExitMonitor(xbmc.Monitor):
-        def __init__(self):
-            self.deactivated = False
-
-        def onScreensaverDeactivated(self):
-            self.deactivated = True
-
-    @classmethod
-    def run(cls):
-        exit_monitor = cls.ExitMonitor()
-        ScreensaverPreview.runAddon()
-        while (
-            not exit_monitor.deactivated
-            and not exit_monitor.abortRequested()
-        ):
-            exit_monitor.waitForAbort(0.1)
+        # Call the script and die
+        self.runAddon()
 
 
 def run():
@@ -82,7 +64,8 @@ def run():
                 xbmc.sleep(100)
                 del screensaver
             else:
-                NativeScreensaverSession.run()
+                ScreensaverPreview.ExitMonitor(ScreensaverPreview.runAddon())
+                ScreensaverPreview.send_input()
 
         else:
             # Transparent placeholder
