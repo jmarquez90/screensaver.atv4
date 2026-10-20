@@ -1,6 +1,10 @@
-Unreleased
+v3.2.0  (2026-10-20)
 - Add independent, opt-in time, date, and Kodi-weather overlays
 - Use Kodi's provider-independent weather labels for refresh, localization, and unit conversion
+- Restore repeat automatic activation and clean input-driven exit
+- Reduce continuous-stream startup time with MPEG-TS identification and decoder priming
+- Improve fullscreen startup presentation without initialization notifications
+- Release Aerial cleanly when external audio or video playback starts
 
 v3.1.0  (2026-10-16)
 - Add optional seamless transitions on LibreELEC using FFmpeg Tools

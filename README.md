@@ -2,7 +2,9 @@
 
 ## Apple Aerial screensavers for Kodi 19+
 
-This addon adds the Apple Aerial screensavers to Kodi Entertainment Center. It can be installed via the Kodi official repository.
+This add-on brings Apple Aerial screensavers to Kodi Entertainment Center. The upstream version
+is available from Kodi's official repository. Fork releases containing the LibreELEC continuous-
+stream and overlay work are installed manually from this repository's Releases page.
 
 ## Plugin Features
 
@@ -28,6 +30,14 @@ This addon adds the Apple Aerial screensavers to Kodi Entertainment Center. It c
   - H.265 4K SDR: 116 files, 48.9GB
   - H.265 4K HDR: 116 files, 75.3GB
 
+## What's new in 3.2.0
+
+- Optional time, date, and Kodi-weather overlays, independently controlled and off by default
+- Reliable repeat automatic activation after an earlier Aerial session exits
+- Faster continuous-stream startup through explicit MPEG-TS identification and decoder priming
+- Cleaner fullscreen startup without the former initialization notification and sound
+- Safe handoff when another audio or video item replaces Aerial playback
+
 ## Seamless transitions on LibreELEC
 
 Aerial can keep one Kodi playback session open across videos to eliminate the blank frame, blue loading spinner, and frozen outgoing frame that can otherwise appear between Aerials. This mode remuxes the randomized playlist into one local stream without re-encoding the videos.
@@ -43,22 +53,42 @@ The following configuration has been verified with both Apple-hosted online vide
 
 Other LibreELEC hardware and video-quality combinations may work but have not yet been verified. On systems where FFmpeg Tools is unavailable, including non-LibreELEC platforms, Aerial automatically retains its original direct-playback behavior. If the continuous stream fails while Aerial is running, it also falls back to direct playback.
 
-The initial screensaver startup may still briefly show a dark screen and loading spinner while Kodi opens and buffers the continuous stream. Once playback begins, transitions between videos remain inside the same Kodi player session.
+On the verified Raspberry Pi configuration, explicit MPEG-TS identification and a short decoder
+primer reduced measured A/V startup to roughly one second. Kodi may still show its dark busy screen
+and spinner while opening the stream. If Kodi changes the display refresh rate after playback
+starts, the television may briefly blank while reacquiring the HDMI signal; playback remains in the
+same Kodi player and FFmpeg process. Once playback begins, transitions between videos stay inside
+that player session.
 
 ### Installing this fork's release
 
-Download the versioned `screensaver.atv4` ZIP from [this fork's Releases page](https://github.com/jmarquez90/screensaver.atv4/releases), then use Kodi's **Install from zip file** action. LibreELEC users who want seamless transitions must also install **FFmpeg Tools** from the LibreELEC add-on repository.
+Download the versioned `screensaver.atv4` ZIP from
+[this fork's Releases page](https://github.com/jmarquez90/screensaver.atv4/releases), then use
+Kodi's **Install from zip file** action. LibreELEC users who want seamless transitions must also
+install **FFmpeg Tools** from the LibreELEC add-on repository. Installing a newer fork ZIP upgrades
+the existing `screensaver.atv4` add-on in place.
+
+## Screensaver lifecycle and playback handoff
+
+Any Kodi-recognized user action exits Aerial. Normal exit stops Aerial's player, overlay, and
+FFmpeg producer, and a later idle period can activate the screensaver again.
+
+Kodi remotes and companion apps can also launch media directly without first sending a normal
+screensaver action. Version 3.2.0 detects when Kodi replaces Aerial's loopback stream, closes the
+Aerial windows, and stops only Aerial's FFmpeg producer. It does not stop the replacement item.
+Replacement video is returned to Kodi's fullscreen-video window; replacement audio is left in its
+normal Kodi presentation.
 
 ## Optional overlays
 
-The unreleased overlay candidate adds separate **Show time**, **Show date**, and **Show weather**
+Version 3.2.0 adds separate **Show time**, **Show date**, and **Show weather**
 settings. All are off by default. Kodi supplies and updates the labels: time and date follow the
 user's regional formats, while Kodi's public weather labels expose the temperature and current
 conditions from whichever provider is configured. The overlay is provider-independent;
-Open-Meteo is the initial live-test target. Aerial adds no weather API, credential, refresh loop,
-Kodi patch, or text baked into the video.
+the live release testing used Kodi's Open-Meteo provider. Aerial adds no weather API, credential,
+refresh loop, Kodi patch, or text baked into the video.
 
-Calendar data is not part of this candidate. It requires separate choices for data source,
+Calendar data is not part of version 3.2.0. It requires separate choices for data source,
 credentials, privacy, refresh cadence, and stale/offline behavior.
 
 ## Aerials History

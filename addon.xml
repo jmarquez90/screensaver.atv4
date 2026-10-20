@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="screensaver.atv4" name="Aerial" version="3.1.0" provider-name="enen92, Jeremiah Steven Marquez">
+<addon id="screensaver.atv4" name="Aerial" version="3.2.0" provider-name="enen92, Jeremiah Steven Marquez">
 	<requires>
 		<import addon="xbmc.python" version="3.0.0"/>
 	</requires>
@@ -17,7 +17,14 @@
 		<summary lang="es_ES">Protector de pantalla Apple TV para Kodi</summary>
 		<description lang="en_GB">This screensaver addon provides Apple TV aerial screensavers in Kodi</description>
     <description lang="es_ES">Este complemento habilita el protector de pantalla Aerial de Apple TV para Kodi</description>
-		<news>v3.1.0  (2026-10-16)
+		<news>v3.2.0  (2026-10-20)
+			- Add independent, opt-in time, date, and Kodi-weather overlays
+			- Restore repeat automatic activation and clean input-driven exit
+			- Reduce continuous-stream startup time with MPEG-TS identification and decoder priming
+			- Improve fullscreen startup presentation without initialization notifications
+			- Release Aerial cleanly when external audio or video playback starts
+
+		v3.1.0  (2026-10-16)
 			- Add optional seamless transitions on LibreELEC using FFmpeg Tools
 			- Preserve randomized playback for online and locally cached Aerials
 			- Fall back to the original playback path when FFmpeg is unavailable
